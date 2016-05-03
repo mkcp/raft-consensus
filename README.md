@@ -1,6 +1,8 @@
 # raft
 
-WIP Implemention of Raft in for brain training.
+Playing with an implemention of raft for brain training.
+
+I afford no guarantees about the quality of this software.
 
 ## Raft Consensus Algorithm
 
