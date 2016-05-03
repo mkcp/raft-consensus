@@ -1,13 +1,11 @@
 (ns raft.core)
 
-(def todo '[log-replication
-            leader-election
-            safety
-            network-discovery?])
+(def goals '[node-states log-replication leader-election membership-changes])
 
+;;;; Node states
 (defn new-node []
-  {:term 0
-   :vote-count 0})
+  {:id (rand-int)
+   :log []})
 
 (defn follower
   ([] (merge (new-node) {:state :follower}))
@@ -21,17 +19,25 @@
   ([] (merge (new-node) {:state :leader}))
   ([node] (assoc node :state :leader)))
 
+;;;; Log replication
+(defn append-entries [leader followers])
+(defn confirm-append [leader])
+(defn rollback [leader])
 
-;;;; Election
+;;;; Leader election
 (defn vote
   [{:keys [vote-count] :as node}]
   (let [new-count (inc vote-count)]
     (assoc node :vote-count new-count)))
 
+(defn higher-term? [network1 network2])
+(defn send-vote-request [network])
+(defn voted-this-term? [node])
 (defn get-timeout [] (random-sample 0.5 #{150 300}))
 (defn heartbeat [])
-(defn elect-leader [nodes])
+(defn elect-leader [network])
 (defn majority-overlap? [config1 config2])
+(defn split-vote? [])
 
 (defn main
   "FIXME: Should probably initialize a network and begin log replication from leader"
