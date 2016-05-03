@@ -2,26 +2,35 @@
   (:require [clojure.test :refer :all]
             [raft.core :as raft]))
 
-(deftest consensus
-  (testing "Node can be follower."
-    (let [node (raft/create-node)]
-      (is (= (:state node)
-             :follower))))
+(deftest node-states
+  (testing "Can create follower node"
+    (let [node (raft/follower)]
+      (is (= (:state node) :follower))))
 
-  (testing "Node can be candidate"
-    (let [node (raft/create-node)
-          node (raft/make-candidate node)]
-      (is (= (:state node)
-             :candidate))))
+  (testing "Follower can become candidate"
+    (let [node (raft/candidate (raft/follower))]
+      (is (= (:state node) :candidate))))
 
-  (testing "Node can be leader"
-    (let [node (raft/create-node)
-          node (raft/make-leader node)]
-      (is (= (:state node)
-             :leader))))
+  (testing "Candidate can become leader"
+    (let [node (raft/leader (raft/candidate))]
+      (is (= (:state node) :leader))))
+
+  (testing "Candidate can become follower"
+    (let [node (raft/follower (raft/candidate))]
+      (is (= (:state node) :follower)))))
+
+(deftest log-replication
+  (testing "FIXME: System can replicate logs."))
+
+(deftest leader-election
+  (testing "FIXME: Nodes have timeout"
+    (let [followers [(raft/follower)
+                     (raft/follower)
+                     (raft/follower)]
+          leader (raft/leader)]))
 
   (testing "FIXME: Can send heartbeat.")
 
-  (testing "FIXME: Can replicate log.")
-
   (testing "FIXME: Can elect leader with 5 nodes"))
+
+(deftest safety)
