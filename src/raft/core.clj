@@ -1,13 +1,19 @@
 (ns raft.core)
 
-Test with 5 nodes.
-Leader is set on startup?
-
 (def todo '[networking logging])
 
-(defn state []
+(def world
   {:nodes 5
    :leader :1})
 
+(defn create-node []
+  {:state :follower})
+
+(defn make-candidate [node]
+  (assoc node :state :candidate))
+
+(defn make-leader [node]
+  (assoc node :state :leader))
+
 (defn main [x]
-  (if I am leader))
+  (println "Main doesn't do anything yet."))
