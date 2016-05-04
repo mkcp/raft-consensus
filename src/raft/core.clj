@@ -1,5 +1,4 @@
-(ns raft.core
-  (:require [clojure.core.async :refer [chan]]))
+(ns raft.core)
 
 (def goals '[node-states leader-election log-replication])
 
