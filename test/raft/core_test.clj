@@ -3,38 +3,38 @@
             [raft.core :as raft]))
 
 (deftest node-states
+  (testing "nodes have an id"
+    (is (some? (:id @(raft/new-node)))))
+
   (testing "Can create follower node"
-    (let [node (raft/follower)]
-      (is (= (:state node) :follower))))
+    (is (= (:state @(raft/follower))
+           :follower)))
 
   (testing "Follower can become candidate"
-    (let [node (raft/candidate (raft/follower))]
-      (is (= (:state node) :candidate))))
+    (is (= (:state (raft/candidate (raft/follower)))
+           :candidate)))
 
   (testing "Candidate can become leader"
-    (let [node (raft/leader (raft/candidate))]
-      (is (= (:state node) :leader))))
+    (is (= (:state (raft/leader (raft/candidate)))
+           :leader)))
 
   (testing "Candidate can become follower"
     (let [node (raft/follower (raft/candidate))]
       (is (= (:state node) :follower)))))
 
-(deftest networking
-  (testing "heartbeat"
-    (testing "FIXME: Can send heartbeat")
-    (testing "FIXME: Can receive heartbeat")))
-
-(deftest log-replication
-  (testing "with leader"
-    (testing "FIXME: log is append only, no deletions or updates")
-    (testing "FIXME: Entries with the same index and term are identical in all entries up to the index")
-    (testing "FIXME: A committed entry in a term is present in the logs of leaders for all higher terms")
-    (testing "FIXME: The state of an entry at a specific index is guaranteed and across the network")))
-
 (deftest leader-election
   (testing "followers"
-    (testing "FIXME: New nodes begin as Follower")
-    (testing "FIXME: After timeout, Follower starts election and becomes Candidate"))
+    (testing "New nodes begin as Follower"
+      (let [node (raft/new-node)]
+        (is (= (:state node)
+               :follower))))
+
+    (testing "FIXME: After timeout, Follower becomes Candidate and begins election"
+      (let [node (raft/new-node)
+                                        ; async timeout then check state? need to start modeling concurrency...
+            ]
+        (is (= (:state node)
+               :candidate)))))
 
   (testing "candidates"
     (testing "FIXME: Candidate remains Candidate if timeout during new election")
@@ -44,3 +44,17 @@
   (testing "leaders"
     (testing "FIXME: Leader becomes Follower if server with higher term discovered")
     (testing "FIXME: Only one Leader can be elected in a given term")))
+
+(deftest log-replication
+  (testing "leader"
+    (testing "can append to log"
+      (let [node (raft/new-node)]
+        (is (= (-> node (raft/append 2) :log first)
+               [:append 2])))))
+
+  (testing "follower"
+    (testing "can copy log"
+      (let [leader (-> (raft/leader) (raft/append 2) :log first)
+            follower (raft/follower)]
+        (is (= (:log leader)
+               (-> follower (raft/append-entries leader) :log)))))))

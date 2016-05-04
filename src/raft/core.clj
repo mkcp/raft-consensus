@@ -1,26 +1,45 @@
-(ns raft.core)
+(ns raft.core
+  (:require [clojure.core.async :refer [chan]]))
 
-(def goals '[node-states log-replication leader-election membership-changes])
+(def goals '[node-states leader-election log-replication])
 
 ;;;; Node states
 (defn new-node []
-  {:id (rand-int)
-   :log []})
+  (atom {:id (str (java.util.UUID/randomUUID))
+         :state :follower
+         :commit-index 0
+         :current-term 0
+         :last-applied 0
+         :voted-for nil
+         :election-alarm 0
+         :peers []
+         :log []}))
 
 (defn follower
-  ([] (merge (new-node) {:state :follower}))
-  ([node] (assoc node :state :follower)))
+  ([] (swap! (new-node) assoc :state :follower))
+  ([node] (swap! node assoc :state :follower)))
 
 (defn candidate
-  ([] (merge (new-node) {:state :candidate}))
-  ([node] (assoc node :state :candidate)))
+  ([] (swap! (new-node) merge {:state :candidate}))
+  ([node] (swap! node assoc :state :candidate)))
 
 (defn leader
   ([] (merge (new-node) {:state :leader}))
-  ([node] (assoc node :state :leader)))
+  ([{:keys [commit-index] :as node}]
+   (swap! node
+          assoc
+          :state :leader
+          :next-index (inc commit-index)
+          :match-index commit-index ; FIXME Probably bugged, check peers?
+          )))
 
 ;;;; Log replication
-(defn append-entries [leader followers])
+(defn append
+  [{:keys [log] :as node} entry]
+  (let [entry [:append entry]]
+    (assoc node :log (conj log entry))))
+
+(defn append-entries [entry node])
 (defn confirm-append [leader])
 (defn rollback [leader])
 
