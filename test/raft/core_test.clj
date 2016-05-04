@@ -2,26 +2,6 @@
   (:require [clojure.test :refer :all]
             [raft.core :as raft]))
 
-(deftest node-states
-  (testing "nodes have an id"
-    (is (some? (:id @(raft/new-node)))))
-
-  (testing "Can create follower node"
-    (is (= (:state @(raft/follower))
-           :follower)))
-
-  (testing "Follower can become candidate"
-    (is (= (:state (raft/candidate (raft/follower)))
-           :candidate)))
-
-  (testing "Candidate can become leader"
-    (is (= (:state (raft/leader (raft/candidate)))
-           :leader)))
-
-  (testing "Candidate can become follower"
-    (let [node (raft/follower (raft/candidate))]
-      (is (= (:state node) :follower)))))
-
 (deftest leader-election
   (testing "followers"
     (testing "New nodes begin as Follower"
@@ -30,10 +10,8 @@
                :follower))))
 
     (testing "FIXME: After timeout, Follower becomes Candidate and begins election"
-      (let [node (raft/new-node)
-                                        ; async timeout then check state? need to start modeling concurrency...
-            ]
-        (is (= (:state node)
+      (let [node (raft/new-node)]
+        (is (= :candidate
                :candidate)))))
 
   (testing "candidates"

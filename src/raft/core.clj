@@ -3,27 +3,23 @@
 (def goals '[node-states leader-election log-replication])
 
 ;;;; Node states
-(defn new-node []
-  (atom {:id (str (java.util.UUID/randomUUID))
-         :state :follower
-         :commit-index 0
-         :current-term 0
-         :last-applied 0
-         :voted-for nil
-         :election-alarm 0
-         :peers []
-         :log []}))
+(defn new-node [peers]
+  {:state :follower
+   :commit-index 0
+   :current-term 0
+   :last-applied 0
+   :voted-for nil
+   :election-alarm 0
+   :peers (or peers [])
+   :log []})
 
-(defn follower
-  ([] (swap! (new-node) assoc :state :follower))
-  ([node] (swap! node assoc :state :follower)))
+(defn follower [peers]
+  (assoc (new-node peers) :state :follower))
 
 (defn candidate
-  ([] (swap! (new-node) merge {:state :candidate}))
   ([node] (swap! node assoc :state :candidate)))
 
 (defn leader
-  ([] (merge (new-node) {:state :leader}))
   ([{:keys [commit-index] :as node}]
    (swap! node
           assoc
@@ -31,6 +27,13 @@
           :next-index (inc commit-index)
           :match-index commit-index ; FIXME Probably bugged, check peers?
           )))
+
+(defn network []
+  {:1 (atom (follower [:2 :3 :4 :5]))
+   :2 (atom (follower [:1 :3 :4 :5]))
+   :3 (atom (follower [:1 :2 :4 :5]))
+   :4 (atom (follower [:1 :2 :3 :5]))
+   :5 (atom (follower [:1 :2 :3 :4]))})
 
 ;;;; Log replication
 (defn append
@@ -57,7 +60,5 @@
 (defn majority-overlap? [config1 config2])
 (defn split-vote? [])
 
-(defn main
-  "FIXME: Should probably initialize a network and begin log replication from leader"
-  [x]
-  (println "Main doesn't do anything yet."))
+(defn main [x]
+  (network))
