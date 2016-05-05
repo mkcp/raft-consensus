@@ -1,7 +1,7 @@
 (ns raft.server
   (:require [clojure.core.async
              :as a
-             :refer [chan go >! >!!  <! <!!]]))
+             :refer [chan go timeout >! >!!  <! <!!]]))
 
 (defn create
   [peers]
@@ -34,21 +34,14 @@
            sent deliver
            term prev-index
            prev-term entries
-           commit-index]}]
-  [:append-entries {:from from
-                    :to to
-                    :sent nil
-                    :deliver nil
-                    :term nil
-                    :prev-index nil
-                    :prev-term nil
-                    :entries nil
-                    :commit-index nil}])
+           commit-index]
+    :as state}]
+  [:append-entries state])
 
 (defn respond-append
-  [term success?]
-  [:append-entries {:term term
-                    :success? success?}])
+  [{:keys [term success?]
+    :as state}]
+  [:append-entries state])
 
 ;; Voting
 (defn higher-term? [local remote] (< local remote))
@@ -67,7 +60,8 @@
 
 (defn init-rpc [{:keys [in out] :as peer}]
   (let [in (chan)
-        out (chan)]
+        out (chan)
+        to (timeout 150)]
     {:in in
      :out out}))
 
@@ -77,3 +71,17 @@
     (case request
       :append-entries (respond-append args)
       :request-vote (respond-vote args)))
+
+;;;; Leader election
+  (defn vote
+    [{:keys [vote-count] :as node}]
+    (let [new-count (inc vote-count)]
+      (assoc node :vote-count new-count)))
+
+  (defn send-vote-request [network])
+  (defn voted-this-term? [node])
+  (defn get-timeout [] (random-sample 0.5 #{150 300}))
+  (defn heartbeat [])
+  (defn elect-leader [network])
+  (defn majority-overlap? [config1 config2])
+  (defn split-vote? [])
