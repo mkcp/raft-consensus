@@ -29,14 +29,13 @@
 (defn start []
   (let [network (network-1)
         server (first network)]
-    (go-loop [s server]
+    (go-loop [[id state] server]
       (<! (timeout 300))
-      (println (s/request-append (:id server)
-                                 (:id (first (:peers server)))
-                                 (:current-term server)))
-
-      (recur s))
+      (let [message (s/request-append (:id state)
+                                      (:id (first (:peers state)))
+                                      (:current-term state))]
+        (println message))
+      (recur [id state]))
     (println "Server started")))
 
-(defn main [x]
-  )
+(defn main [x])

@@ -38,10 +38,27 @@
           :match-index commit-index ; FIXME Probably bugged, check peers?
           )))
 
-(defn request-append [sender recipient term]
+(defn request-vote [from to term granted?]
+  {:from from
+   :to to
+   :sent :todo-time-sent
+   :deliver :todo-time-deliver
+   :term term
+   :last-log-index :todo-last-log-index
+   :last-log-term :todo-last-log-term})
+
+(defn respond-vote [from to term granted?]
+  {:from from
+   :to to
+   :sent :todo-time-sent
+   :deliver :todo-time-deliver
+   :term term
+   :granted? granted?})
+
+(defn request-append [from to term]
   [:append-entries
-   {:from sender
-    :to recipient
+   {:from from
+    :to to
     :sent :todo-time-sent
     :deliver :todo-time-deliver
     :term term
@@ -51,17 +68,17 @@
     :commit-index 0}])
 
 (defn respond-append
-  [sender recipient term success? match-index]
+  [from to term success? match-index]
   [:append-entries
-   {:from sender
-    :to recipient
+   {:from from
+    :to to
     :sent :todo-time-sent
     :deliver :todo-time-deliver
     :term term
     :success? success?
     :match-index match-index}])
 
-;; Voting
+;;;; Leader election
 (defn higher-term? [local remote] (< local remote))
 
 (defn request-vote
@@ -76,6 +93,16 @@
   [:request-vote {:term term
                   :vote-granted vote-granted?}])
 
+(defn vote
+  [{:keys [vote-count] :as node}]
+  (let [new-count (inc vote-count)]
+    (assoc node :vote-count new-count)))
+
+(defn voted-this-term? [node])
+(defn get-timeout [] (random-sample 0.5 #{150 300}))
+(defn heartbeat [])
+
+;; RPC
 (defn handle-rpc [message]
   (let [request (first message)
         args (second message)]
@@ -83,16 +110,8 @@
       :append-entries (respond-append args)
       :request-vote (respond-vote args))))
 
-;;;; Leader election
-(defn vote
-  [{:keys [vote-count] :as node}]
-  (let [new-count (inc vote-count)]
-    (assoc node :vote-count new-count)))
 
-(defn send-vote-request [network])
-(defn voted-this-term? [node])
-(defn get-timeout [] (random-sample 0.5 #{150 300}))
-(defn heartbeat [])
+;; High level properties that may not be applicable on the node level.
 (defn elect-leader [network])
 (defn majority-overlap? [config1 config2])
 (defn split-vote? [])
