@@ -38,17 +38,28 @@
           :match-index commit-index ; FIXME Probably bugged, check peers?
           )))
 
-(defn request-append
-  [{:keys [from to sent deliver
-           term prev-index prev-term
-           entries commit-index]
-    :as args}]
-  [:append-entries args])
+(defn request-append [sender recipient term]
+  [:append-entries
+   {:from sender
+    :to recipient
+    :sent :todo-time-sent
+    :deliver :todo-time-deliver
+    :term term
+    :prev-index 0
+    :prev-term 0
+    :entries []
+    :commit-index 0}])
 
 (defn respond-append
-  [{:keys [term success?] :as args}]
-  [:append-entries {:term term
-                    :success? success?}])
+  [sender recipient term success? match-index]
+  [:append-entries
+   {:from sender
+    :to recipient
+    :sent :todo-time-sent
+    :deliver :todo-time-deliver
+    :term term
+    :success? success?
+    :match-index match-index}])
 
 ;; Voting
 (defn higher-term? [local remote] (< local remote))

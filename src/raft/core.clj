@@ -2,7 +2,8 @@
   (:require [raft.server :as s]
             [clojure.core.async
              :as a
-             :refer [chan go]]))
+             :refer [chan go go-loop
+                     timeout >! >!! <! <!!]]))
 
 (def inboxes
   {:1 (chan)
@@ -25,17 +26,17 @@
    :4 (s/create [:1 :2 :3 :5])
    :5 (s/create [:1 :2 :3 :4])})
 
-(defn spawn-servers [network]
-  (loop [n (count network)
-         server network]
-    (if (> n 0)
-      (do
-        (println server)
-        (recur (dec n) network)
-        ))
+(defn start []
+  (let [network (network-1)
+        server (first network)]
+    (go-loop [s server]
+      (<! (timeout 300))
+      (println (s/request-append (:id server)
+                                 (:id (first (:peers server)))
+                                 (:current-term server)))
 
-    "Servers started."))
+      (recur s))
+    (println "Server started")))
 
 (defn main [x]
-  (let [network (network-1)]
-    ))
+  )
