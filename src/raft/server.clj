@@ -3,15 +3,24 @@
              :as a
              :refer [chan go timeout >! >!!  <! <!!]]))
 
-(defn create []
+(defn peer [id]
+  {:peer id
+   :next-index 1
+   :match-index 0
+   :vote-granted false
+   :rpc-due 300
+   :heartbeat-due 300})
+
+(defn create [peers]
   {:state :follower
    :current-term 0
    :voted-for nil
    :commit-index 0
    :last-applied 0
    :election-alarm 0
-   :inbox (chan)
-   :peers []
+   :peers (if peers
+            (mapv peer peers)
+            [])
    :log []})
 
 (defn follower [node]

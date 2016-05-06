@@ -1,6 +1,15 @@
 (ns raft.core
   (:require [raft.server :as s]
-            [clojure.core.async :as a]))
+            [clojure.core.async
+             :as a
+             :refer [chan go]]))
+
+(def inboxes
+  {:1 (chan)
+   :2 (chan)
+   :3 (chan)
+   :4 (chan)
+   :5 (chan)})
 
 (defn network-1 []
   {:1 (s/create [])})
@@ -16,28 +25,17 @@
    :4 (s/create [:1 :2 :3 :5])
    :5 (s/create [:1 :2 :3 :4])})
 
-(defn get-peers
-  [{:keys [id inbox commit-index] :as state}]
-  (let [peer {:peer id
-              :inbox inbox
-              :next-index (inc commit-index)
-              :match-index 0
-              :vote-granted false
-              :rpc-due 300
-              :heartbeat-due 24}]))
-
-(defn set-peers [network]
-  (let [peers (map get-peers )
-        nodes (values network)
-        nodes (map #(assoc % :peers peers) nodes)]
-    nodes))
-
 (defn spawn-servers [network]
-  (let [servers (resolve-peers network)]
-    ;; Spawn a go loop per server which reads from its
-    ;; inbox and matches the message to an rpc
-    ))
+  (loop [n (count network)
+         server network]
+    (if (> n 0)
+      (do
+        (println server)
+        (recur (dec n) network)
+        ))
+
+    "Servers started."))
 
 (defn main [x]
   (let [network (network-1)]
-    (println network)))
+    ))
