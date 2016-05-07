@@ -7,8 +7,8 @@
             [taoensso.timbre :as t]
             [taoensso.timbre.appenders.core :as appenders]))
 
-(t/set-config! {:min-level nil
-                :appenders {:spit (appenders/spit-appender {:fname "raft.log"})}})
+(t/merge-config! {:async? true
+                  :appenders {:spit (appenders/spit-appender {:fname "raft.log"})}})
 
 (def inboxes
   {:1 (chan)
@@ -64,6 +64,6 @@
       (-> server
           handle
           recur))
-    (t/infof "Server started.")))
+    (t/info "Server started.")))
 
 (defn main [x])
