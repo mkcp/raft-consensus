@@ -3,7 +3,9 @@
              :as a
              :refer [chan go timeout >! >!!  <! <!!]]))
 
-(defn peer [id]
+(defn peer
+  "Takes a peer id and intializes the state for a new network."
+  [id]
   {:peer id
    :next-index 1
    :match-index 0
@@ -11,16 +13,15 @@
    :rpc-due 300
    :heartbeat-due 300})
 
-(defn create [peers]
+(defn create
+  [peers]
   {:state :follower
    :current-term 0
    :voted-for nil
    :commit-index 0
    :last-applied 0
    :election-alarm 0
-   :peers (if peers
-            (mapv peer peers)
-            [])
+   :peers (mapv peer peers)
    :log []})
 
 (defn follower [node]

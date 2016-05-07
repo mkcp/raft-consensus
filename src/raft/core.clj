@@ -3,7 +3,12 @@
             [clojure.core.async
              :as a
              :refer [chan go go-loop
-                     timeout >! >!! <! <!!]]))
+                     timeout >! >!! <! <!!]]
+            [taoensso.timbre :as t]
+            [taoensso.timbre.appenders.core :as appenders]))
+
+(t/set-config! {:min-level nil
+                :appenders {:spit (appenders/spit-appender {:fname "raft.log"})}})
 
 (def inboxes
   {:1 (chan)
@@ -26,16 +31,39 @@
    :4 (s/create [:1 :2 :3 :5])
    :5 (s/create [:1 :2 :3 :4])})
 
+(defn get-inbox [server]
+  (let [id (first server)]
+    (id inboxes)))
+
+(defn handle-follower [server]
+  (let [[id state] server
+        peers (:peers state)
+        message (s/request-append (:id state)
+                                  (:id (first (:peers state)))
+                                  (:current-term state))]
+    (t/infof "%s" message)
+    server))
+
+(defn handle-candidate [])
+(defn handle-leader [])
+
+(defn handle [server]
+  (let [[id state] server]
+    (case (:state state)
+      :follower (handle-follower server)
+      :candidate (handle-follower server)
+      :leader (handle-follower server))))
+
 (defn start []
   (let [network (network-1)
         server (first network)]
+
+    ;; This should eventually create a loop for all servers in the network
     (go-loop [[id state] server]
       (<! (timeout 300))
-      (let [message (s/request-append (:id state)
-                                      (:id (first (:peers state)))
-                                      (:current-term state))]
-        (println message))
-      (recur [id state]))
-    (println "Server started")))
+      (-> server
+          handle
+          recur))
+    (t/infof "Server started.")))
 
 (defn main [x])
