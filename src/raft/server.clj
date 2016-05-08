@@ -98,7 +98,6 @@
     :append-entries (respond-append args)
     :request-vote (respond-vote args)))
 
-
 ;; High level properties that may not be applicable on the node level.
 (defn elect-leader [network])
 (defn majority-overlap? [config1 config2])

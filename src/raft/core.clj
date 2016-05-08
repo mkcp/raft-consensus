@@ -62,8 +62,6 @@
     (let [[id state] server
           ;; FIXME Can decouple from world state?
           inbox (id inboxes)
-
-          ;; FIXME should 
           to (case id
                :1 :2
                :2 :1)
