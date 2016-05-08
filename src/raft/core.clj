@@ -35,35 +35,50 @@
   (let [id (first server)]
     (id inboxes)))
 
-(defn handle-follower [server]
-  (let [[id state] server
-        peers (:peers state)
-        message (s/request-append (:id state)
-                                  (:id (first (:peers state)))
-                                  (:current-term state))]
-    (t/infof "%s" message)
-    server))
-
+(defn handle-follower [])
 (defn handle-candidate [])
 (defn handle-leader [])
 
 (defn handle [server]
-  (let [[id state] server]
-    (case (:state state)
-      :follower (handle-follower server)
-      :candidate (handle-follower server)
-      :leader (handle-follower server))))
+  (let [[id state] server
+        mode (:state state)]
+    (t/info mode)
+    (let [[id state] server
+          peers (:peers state)
+          message (s/request-append (:id state)
+                                    (:id (first (:peers state)))
+                                    (:current-term state))]
+      server)
 
-(defn start []
-  (let [network (network-1)
-        server (first network)]
+    #_(case mode
+        :follower (handle-follower server)
+        :candidate (handle-follower server)
+        :leader (handle-follower server))))
 
-    ;; This should eventually create a loop for all servers in the network
-    (go-loop [[id state] server]
-      (<! (timeout 300))
-      (-> server
-          handle
-          recur))
-    (t/info "Server started.")))
+(defn start
+  "Takes a server configuration and runs a go loop."
+  [config]
+  (go-loop [server config]
+    (let [[id state] server
+          ;; FIXME Can decouple from world state?
+          inbox (id inboxes)
 
-(defn main [x])
+          ;; FIXME should 
+          to (case id
+               :1 :2
+               :2 :1)
+          msg (<! inbox)]
+      (t/info msg)
+      (recur server))))
+
+(defn main
+  "Create a network configuration and start each server."
+  []
+  (let [network (network-2)
+        c (count network)]
+
+    (go (doseq [[id ch] inboxes]
+          (>! ch (s/request-append :test-server id 0))))
+
+    (doseq [server network] (start server))
+    (t/infof "%s Server(s) started." c)))

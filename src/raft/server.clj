@@ -39,24 +39,8 @@
           :match-index commit-index ; FIXME Probably bugged, check peers?
           )))
 
-(defn request-vote [from to term granted?]
-  {:from from
-   :to to
-   :sent :todo-time-sent
-   :deliver :todo-time-deliver
-   :term term
-   :last-log-index :todo-last-log-index
-   :last-log-term :todo-last-log-term})
-
-(defn respond-vote [from to term granted?]
-  {:from from
-   :to to
-   :sent :todo-time-sent
-   :deliver :todo-time-deliver
-   :term term
-   :granted? granted?})
-
-(defn request-append [from to term]
+(defn request-append
+  [from to term]
   [:append-entries
    {:from from
     :to to
@@ -82,17 +66,22 @@
 ;;;; Leader election
 (defn higher-term? [local remote] (< local remote))
 
-(defn request-vote
-  [term id last-log-index last-log-term]
-  [:request-vote {:term term
-                  :candidate-id id
-                  :last-log-index last-log-index
-                  :last-log-term last-log-term}])
+(defn request-vote [from to term granted?]
+  {:from from
+   :to to
+   :sent :todo-time-sent
+   :deliver :todo-time-deliver
+   :term term
+   :last-log-index :todo-last-log-index
+   :last-log-term :todo-last-log-term})
 
-(defn respond-vote
-  [term vote-granted?]
-  [:request-vote {:term term
-                  :vote-granted vote-granted?}])
+(defn respond-vote [from to term granted?]
+  {:from from
+   :to to
+   :sent :todo-time-sent
+   :deliver :todo-time-deliver
+   :term term
+   :granted? granted?})
 
 (defn vote
   [{:keys [vote-count] :as node}]
@@ -103,13 +92,11 @@
 (defn get-timeout [] (random-sample 0.5 #{150 300}))
 (defn heartbeat [])
 
-;; RPC
-(defn handle-rpc [message]
-  (let [request (first message)
-        args (second message)]
-    (case request
-      :append-entries (respond-append args)
-      :request-vote (respond-vote args))))
+(defn handle-rpc
+  [[request args]]
+  (case request
+    :append-entries (respond-append args)
+    :request-vote (respond-vote args)))
 
 
 ;; High level properties that may not be applicable on the node level.
