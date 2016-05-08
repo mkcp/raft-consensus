@@ -12,6 +12,12 @@ fault-tolerance and performance. The difference is that it's decomposed
 into relatively independent subproblems, and it cleanly addresses all
 major pieces needed for practical systems.
 
+## Implemtation status
+[ ] Leader Election
+[ ] Log Replication
+[ ] Safety
+[ ] Log Compaction
+
 ## Usage
 
 Need lein. Nothing to use yet tho!
