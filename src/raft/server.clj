@@ -1,7 +1,8 @@
 (ns raft.server
   (:require [clojure.core.async
              :as a
-             :refer [chan go timeout >! >!!  <! <!!]]))
+             :refer [chan go timeout >! >!!  <! <!!]]
+            [taoensso.timbre :as t]))
 
 (defn peer
   "Takes a peer id and intializes the state for a new network."
@@ -94,9 +95,12 @@
 
 (defn handle-rpc
   [[request args]]
-  (case request
-    :append-entries (respond-append args)
-    :request-vote (respond-vote args)))
+  (case s
+    :follower (case request
+                :request-vote (respond-vote args)
+                :append-entries (respond-append args))
+    :candidate (t/info ":candidate")
+    :leader (t/info ":leader")))
 
 ;; High level properties that may not be applicable on the node level.
 (defn elect-leader [network])
