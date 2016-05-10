@@ -12,15 +12,20 @@ fault-tolerance and performance. The difference is that it's decomposed
 into relatively independent subproblems, and it cleanly addresses all
 major pieces needed for practical systems.
 
-## Implemtation status
-[ ] Leader Election
-[ ] Log Replication
-[ ] Safety
-[ ] Log Compaction
+## Implementation status
+- [ ] Leader Election
+
+- [ ] Log Replication
+
+- [ ] Safety
+
+- [ ] Log Compaction
 
 ## Usage
 
-Need lein. Nothing to use yet tho!
+Currently developing with cider, so running the code involved loading the project up and running a fn in core.
+
+If you run start, the nodes in hte network will start up and read the message I've configured in their inboxes. I still need to figure out how to do the timeouts needed for the raft spec, as doing a timeout will block the thread. need to read more about core.async, as alts seems promising.
 
 ## License
 
