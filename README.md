@@ -2,7 +2,17 @@
 
 Playing with an implemention of raft for brain training.
 
-I afford no guarantees about the quality of this software.
+
+The goals of consensus are outlined here:
+https://www.wikiwand.com/en/Consensus_(computer_science)
+
+To establish consensus we will ensure a consistent state machine across a cluster of servers. 
+
+We will elect leader for the cluster, by a timeout-to-candidate transition. If a node has not received an update from a leader in the timeout period, it changes state from follower to candidate. With this transition, the node broadcasts a RequestVote message to the entire cluster, incrementing its own election term.
+
+Nodes respond to a RequestVote by granting a vote if they have not yet voted in the latest term. RequestVote messages received after a vote has been granted are responded to with a false.
+
+Once a node has received a majority of votes from the cluster, it transitions from candidate to leader. The leader then periodically broadcasts AppendEntries messages to all nodes in the cluster.
 
 ## Raft Consensus Algorithm
 
