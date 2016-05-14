@@ -1,8 +1,6 @@
 (ns raft.core
   (:require [raft.server :as s]
-            [clojure.core.async
-             :as a
-             :refer [chan go go-loop timeout >! >!! <! <!!]]
+            [clojure.core.async :refer [chan go go-loop timeout >! >!! <! <!!]]
             [taoensso.timbre :as t]
             [taoensso.timbre.appenders.core :as appenders]))
 
@@ -30,19 +28,24 @@
    :4 (s/create [:1 :2 :3 :5])
    :5 (s/create [:1 :2 :3 :4])})
 
+(defn broadcast-append []
+  (go (doseq [[id ch] @inboxes]
+        (>! ch (s/respond-append :0 id 0 true 0)))))
+
 (defn start
   "Takes a server configuration and runs a go loop."
   [config]
   (go-loop [server config]
     (let [[id state] server
           inbox (id @inboxes)]
-      (when (not (nil? inbox))
-        (let [msg (<! inbox)
-              s (:state state)]
-          (case s
-            :follower (s/handle-rpc msg)
-            :candidate (s/handle-rpc msg)
-            :leader (s/handle-rpc msg)))
+      (let [msg (<! inbox)
+            st (:state state)
+            new-state (case st
+                        :follower (s/handle-rpc msg)
+                        :candidate (s/handle-rpc msg)
+                        :leader (s/handle-rpc msg))
+            server [id new-state]]
+        (t/info server)
         (recur server)))))
 
 (defn main
@@ -50,9 +53,6 @@
   []
   (let [network (network-5)
         c (count network)]
-
-    (go (doseq [[id ch] @inboxes]
-          (>! ch (s/request-append :test-server id 0))))
-    (t/info network)
-    (doseq [server network] (start server))
+    (doseq [server network]
+      (start server))
     (t/info c " Server(s) started.")))

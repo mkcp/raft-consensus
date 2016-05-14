@@ -93,14 +93,15 @@
 (defn get-timeout [] (random-sample 0.5 #{150 300}))
 (defn heartbeat [])
 
+;; FIXME add routing
 (defn handle-rpc
   [[request args]]
-  (case s
-    :follower (case request
-                :request-vote (respond-vote args)
-                :append-entries (respond-append args))
-    :candidate (t/info ":candidate")
-    :leader (t/info ":leader")))
+  #_(case s
+      :follower (case request
+                  :request-vote (respond-vote args)
+                  :append-entries (respond-append args))
+      :candidate (t/info ":candidate")
+      :leader (t/info ":leader")))
 
 ;; High level properties that may not be applicable on the node level.
 (defn elect-leader [network])
