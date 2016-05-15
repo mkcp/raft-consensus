@@ -67,7 +67,9 @@
 ;;;; Leader election
 (defn higher-term? [local remote] (< local remote))
 
-(defn request-vote [from to term granted?]
+;; TODO build messsage from server state
+(defn request-vote
+  [from to term granted?]
   {:from from
    :to to
    :sent :todo-time-sent
@@ -76,7 +78,10 @@
    :last-log-index :todo-last-log-index
    :last-log-term :todo-last-log-term})
 
-(defn respond-vote [from to term granted?]
+;; TODO Assoc new server state
+(defn respond-vote
+  [{:keys [from to term granted?] :as message}
+   server]
   {:from from
    :to to
    :sent :todo-time-sent
@@ -95,15 +100,7 @@
 
 ;; FIXME add routing
 (defn handle-rpc
-  [[request args]]
-  #_(case s
-      :follower (case request
-                  :request-vote (respond-vote args)
-                  :append-entries (respond-append args))
-      :candidate (t/info ":candidate")
-      :leader (t/info ":leader")))
-
-;; High level properties that may not be applicable on the node level.
-(defn elect-leader [network])
-(defn majority-overlap? [config1 config2])
-(defn split-vote? [])
+  [[procedure message] {:keys [state] :as server}]
+  (case procedure
+    :request-vote (respond-vote message server)
+    :append-entries (respond-append message server)))

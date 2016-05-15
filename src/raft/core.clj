@@ -1,6 +1,6 @@
 (ns raft.core
   (:require [raft.server :as s]
-            [clojure.core.async :refer [chan go go-loop timeout >! >!! <! <!!]]
+            [clojure.core.async :refer [chan go go-loop timeout >! >!! <! <!! alts!]]
             [taoensso.timbre :as t]
             [taoensso.timbre.appenders.core :as appenders]))
 
@@ -32,21 +32,18 @@
   (go (doseq [[id ch] @inboxes]
         (>! ch (s/respond-append :0 id 0 true 0)))))
 
+;; TODO Change loop behavior based on server state. Currently is only for follower. 
 (defn start
-  "Takes a server configuration and runs a go loop."
+  "Takes a server configuration and starts each server's loop."
   [config]
   (go-loop [server config]
-    (let [[id state] server
-          inbox (id @inboxes)]
-      (let [msg (<! inbox)
-            st (:state state)
-            new-state (case st
-                        :follower (s/handle-rpc msg)
-                        :candidate (s/handle-rpc msg)
-                        :leader (s/handle-rpc msg))
-            server [id new-state]]
-        (t/info server)
-        (recur server)))))
+    (let [[id server] server
+          inbox (alts! [(id @inboxes)
+                        (timeout 300)])
+          request (<! inbox)
+          new-server (s/handle-rpc request server)]
+      (t/info [id new-server])
+      (recur [id new-server]))))
 
 (defn main
   "Create a network configuration and start each server."
