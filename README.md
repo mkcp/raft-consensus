@@ -1,10 +1,21 @@
 # raft
 
-Playing with an implemention of raft for brain training.
+Playing with an implemention of raft for brain training. This algorithm simulation is incomplete, the section Implementation Status below tracks my current progress.
 
+## Goals
 
 The goals of consensus are outlined here:
 https://www.wikiwand.com/en/Consensus_(computer_science)
+
+## Raft Consensus Algorithm
+
+[Raft](http://raftconsensus.github.io/) is a consensus algorithm that is
+designed to be easy to understand. It's equivalent to Paxos in
+fault-tolerance and performance. The difference is that it's decomposed
+into relatively independent subproblems, and it cleanly addresses all
+major pieces needed for practical systems.
+
+### Explanation
 
 To establish consensus we will ensure a consistent state machine across a cluster of servers. 
 
@@ -14,13 +25,6 @@ Nodes respond to a RequestVote by granting a vote if they have not yet voted in 
 
 Once a node has received a majority of votes from the cluster, it transitions from candidate to leader. The leader then periodically broadcasts AppendEntries messages to all nodes in the cluster.
 
-## Raft Consensus Algorithm
-
-[Raft](http://raftconsensus.github.io/) is a consensus algorithm that is
-designed to be easy to understand. It's equivalent to Paxos in
-fault-tolerance and performance. The difference is that it's decomposed
-into relatively independent subproblems, and it cleanly addresses all
-major pieces needed for practical systems.
 
 ## Implementation status
 - [ ] Leader Election
