@@ -7,7 +7,7 @@ Playing with an implemention of raft for brain training. This algorithm simulati
 The goals of consensus are outlined here:
 https://www.wikiwand.com/en/Consensus_(computer_science)
 
-## Raft Consensus Algorithm
+## The Raft Consensus Algorithm
 
 [Raft](http://raftconsensus.github.io/) is a consensus algorithm that is
 designed to be easy to understand. It's equivalent to Paxos in
@@ -15,7 +15,7 @@ fault-tolerance and performance. The difference is that it's decomposed
 into relatively independent subproblems, and it cleanly addresses all
 major pieces needed for practical systems.
 
-### Explanation
+### Raft's Semantics
 
 To establish consensus we will ensure a consistent state machine across a cluster of servers. 
 
@@ -39,7 +39,7 @@ Once a node has received a majority of votes from the cluster, it transitions fr
 
 Currently developing with cider, so running the code involved loading the project up and running a fn in core.
 
-If you run start, the nodes in hte network will start up and read the message I've configured in their inboxes. I still need to figure out how to do the timeouts needed for the raft spec, as doing a timeout will block the thread. need to read more about core.async, as alts seems promising.
+Run `main` and the cluster will startup with the configuration bound in under `network`.
 
 ## License
 
