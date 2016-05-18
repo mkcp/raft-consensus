@@ -32,18 +32,35 @@
   (go (doseq [[id ch] @inboxes]
         (>! ch (s/respond-append :0 id 0 true 0)))))
 
-;; TODO Change loop behavior based on server state. Currently is only for follower. 
+(defn get-timeout [] (random-sample 0.5 #{150 300}))
+
+(defn handle-tick [request server]
+  (case (:state server)
+    :follower (s/handle-follower request server)
+    :candidate (s/handle-candidate request server)
+    :leader (s/handle-leader request server)))
+
+(defn tick
+  "Reads a message off the inbox or times out, then peforms the
+  resulting state transition before returning the new state of the server."
+  [[id server]]
+  (let [inbox (id @inboxes)
+        request (<! (alts! [inbox (timeout 300)]))
+        new-server (handle-tick request server)]
+
+    ;; TODO Send messages
+    (comment (for [message messages]
+               (>! receipient message)))
+
+    new-server))
+
 (defn start
-  "Takes a server configuration and starts each server's loop."
+  "Each loop advances server state by one tick, and performs any logging."
   [config]
   (go-loop [server config]
-    (let [[id server] server
-          inbox (alts! [(id @inboxes)
-                        (timeout 300)])
-          request (<! inbox)
-          new-server (s/handle-rpc request server)]
-      (t/info [id new-server])
-      (recur [id new-server]))))
+    (let [new-server (tick server)]
+      (t/info new-server)
+      (recur new-server))))
 
 (defn main
   "Create a network configuration and start each server."

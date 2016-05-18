@@ -14,8 +14,7 @@
    :rpc-due 300
    :heartbeat-due 300})
 
-(defn create
-  [peers]
+(defn create [peers]
   {:state :follower
    :current-term 0
    :voted-for nil
@@ -23,22 +22,29 @@
    :last-applied 0
    :election-alarm 0
    :peers (mapv peer peers)
-   :log []})
+   :log []
+   :messages []})
 
-(defn follower [node]
-  (assoc node :state :follower))
+(defn follower
+  [server]
+  (assoc server
+         :state
+         :follower))
 
-(defn candidate [node]
-  (assoc node :state :candidate))
+(defn candidate
+  [server]
+  (assoc server
+         :state :candidate
+         :messages [] ; TODO Fill with messages to peers
+         ))
 
 (defn leader
-  [{:keys [commit-index] :as node}]
-  ((swap! node
-          assoc
-          :state :leader
-          :next-index (inc commit-index)
-          :match-index commit-index ; FIXME Probably bugged, check peers?
-          )))
+  [{:keys [commit-index] :as server}]
+  (assoc server
+         :state :leader
+         :next-index (inc commit-index)
+         :match-index commit-index ; FIXME Probably bugged, check peers?
+         ))
 
 (defn request-append
   [from to term]
@@ -89,18 +95,30 @@
    :term term
    :granted? granted?})
 
+(defn voted-this-term? [server])
+
 (defn vote
-  [{:keys [vote-count] :as node}]
+  [{:keys [vote-count] :as server}]
   (let [new-count (inc vote-count)]
-    (assoc node :vote-count new-count)))
+    (assoc server :vote-count new-count)))
 
-(defn voted-this-term? [node])
-(defn get-timeout [] (random-sample 0.5 #{150 300}))
-(defn heartbeat [])
+(defn handle-follower
+  [request server]
+  (let [procedure (first request)
+        message (rest request)]
+    (case procedure
+      :request-vote (respond-vote message server)
+      :append-entries (respond-append message server)
+      nil (candidate server))))
 
-;; FIXME add routing
-(defn handle-rpc
-  [[procedure message] {:keys [state] :as server}]
+(defn handle-candidate
+  [[procedure message] server]
+  (case procedure
+    :request-vote (respond-vote message server)
+    :append-entries (respond-append message server)))
+
+(defn handle-leader
+  [[procedure message] server]
   (case procedure
     :request-vote (respond-vote message server)
     :append-entries (respond-append message server)))
