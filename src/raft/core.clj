@@ -6,6 +6,13 @@
 (t/merge-config! {:async? true
                   :appenders {:spit (appenders/spit-appender {:fname "raft.log"})}})
 
+(def inboxes
+  (atom {:1 (chan)
+         :2 (chan)
+         :3 (chan)
+         :4 (chan)
+         :5 (chan)}))
+
 (defn peer
   "Takes a peer id and intializes the state for a new network."
   [id]
@@ -16,7 +23,9 @@
    :rpc-due 300
    :heartbeat-due 300})
 
-(defn create [peers]
+(defn create
+  "Initalized state of a server."
+  [peers]
   {:state :follower
    :current-term 0
    :voted-for nil
@@ -27,8 +36,7 @@
    :log []
    :messages []})
 
-(defn follower
-  [server]
+(defn follower [server]
   (assoc server
          :state
          :follower))
@@ -104,12 +112,13 @@
     (assoc server :vote-count new-count)))
 
 (defn handle-follower
-  [request server]
+  [request {:keys [messages] :as server}]
   (let [procedure (first request)
-        message (rest request)]
+        message (rest request)
+        add-message #(assoc server :messages (conj messages (% message server)))]
     (case procedure
-      :request-vote server #_(respond-vote message server)
-      :append-entries server #_(respond-append message server)
+      :request-vote (add-message respond-vote)
+      :append-entries (add-message respond-append)
       nil (candidate server))))
 
 (defn handle-candidate
@@ -124,12 +133,34 @@
     :request-vote (respond-vote message server)
     :append-entries (respond-append message server)))
 
-(def inboxes
-  (atom {:1 (chan)
-         :2 (chan)
-         :3 (chan)
-         :4 (chan)
-         :5 (chan)}))
+(defn broadcast-append []
+  (go (doseq [[id ch] @inboxes]
+        (>! ch (respond-append :0 id 0 true 0)))))
+
+(defn get-timeout [] (random-sample 0.5 #{150 300}))
+
+(defn handle
+  [request {:keys [state messages] :as server}]
+  (let [server (assoc server :messages [])] ; Clear messages
+    (case state
+      :follower (handle-follower request server)
+      :candidate (handle-candidate request server)
+      :leader (handle-leader request server))) )
+
+(defn send-messages! [{:keys [messages]}]
+  (doseq [{:keys [to] :as message} messages]
+    (>! (to inboxes) message)))
+
+(defn start [config]
+  (let [heartbeat (timeout 300)]
+    (go-loop [[id server] config]
+      (let [inbox (id @inboxes)
+            request (<! (alts! heartbeat inbox))
+            new-server (handle request server)
+            response [id new-server]]
+        #_(send-messages! new-server) ; TODO
+        (t/info response)
+        (recur response)))))
 
 (defn network-1 []
   {:1 (create [])})
@@ -145,28 +176,6 @@
    :4 (create [:1 :2 :3 :5])
    :5 (create [:1 :2 :3 :4])})
 
-(defn broadcast-append []
-  (go (doseq [[id ch] @inboxes]
-        (>! ch (respond-append :0 id 0 true 0)))))
-
-(defn get-timeout [] (random-sample 0.5 #{150 300}))
-
-(defn handle [request server]
-  (case (:state server)
-    :follower (handle-follower request server)
-    :candidate (handle-candidate request server)
-    :leader (handle-leader request server)))
-
-(defn start [config]
-  (go-loop [[id server] config]
-    (let [inbox (id @inboxes)
-          request (<! (timeout 3000))
-          response [id server]
-         ; new-server (handle request server)
-          ]
-      (t/info response)
-      (recur response))))
-
 (defn main
   "Create a network configuration and start each server."
   []
@@ -175,14 +184,3 @@
     (doseq [node network]
       (start node))
     (t/info c " Server(s) started.")))
-
-(defn send-messages [messages]
-  (for [{:keys [to] :as message} messages]
-    (>! (to @inboxes) message)))
-
-
-
-(defn product [n1 n2]
-  (if (> n2 1)
-    (+ n1 (product n1 (dec n2)))
-    n1))
