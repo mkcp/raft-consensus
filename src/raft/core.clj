@@ -1,10 +1,15 @@
 (ns raft.core
-  (:require [clojure.core.async :refer [chan go go-loop timeout >! >!! <! <!! alts!]]
+  (:require [clojure.core.async :refer [chan go go-loop timeout >! >!! <! <!! alts! close!]]
             [taoensso.timbre :as t]
-            [taoensso.timbre.appenders.core :as appenders]))
+            [taoensso.timbre.appenders.core :as appenders]
+            [taoensso.timbre.appenders.3rd-party.rotor :as rotor]))
 
-(t/merge-config! {:async? true
-                  :appenders {:spit (appenders/spit-appender {:fname "raft.log"})}})
+(t/merge-config! {:appenders
+                  {:rotor (rotor/rotor-appender {:max-size (* 1024 1024)
+                                                 :backlog 32
+                                                 :path "raft.log"})}})
+
+(def ^:dynamic stop (chan))
 
 (def inboxes
   (atom {:1 (chan)
@@ -37,9 +42,7 @@
    :messages []})
 
 (defn follower [server]
-  (assoc server
-         :state
-         :follower))
+  (assoc server :state :follower))
 
 (defn candidate
   [server]
@@ -58,27 +61,25 @@
 
 (defn request-append
   [from to term]
-  [:append-entries
-   {:from from
-    :to to
-    :sent :todo-time-sent
-    :deliver :todo-time-deliver
-    :term term
-    :prev-index 0
-    :prev-term 0
-    :entries []
-    :commit-index 0}])
+  [:append-entries {:from from
+                    :to to
+                    :sent :todo-time-sent
+                    :deliver :todo-time-deliver
+                    :term term
+                    :prev-index 0
+                    :prev-term 0
+                    :entries []
+                    :commit-index 0}])
 
 (defn respond-append
   [from to term success? match-index]
-  [:append-entries
-   {:from from
-    :to to
-    :sent :todo-time-sent
-    :deliver :todo-time-deliver
-    :term term
-    :success? success?
-    :match-index match-index}])
+  [:append-entries {:from from
+                    :to to
+                    :sent :todo-time-sent
+                    :deliver :todo-time-deliver
+                    :term term
+                    :success? success?
+                    :match-index match-index}])
 
 ;;;; Leader election
 (defn higher-term? [local remote] (< local remote))
@@ -141,7 +142,7 @@
 
 (defn handle
   [request {:keys [state messages] :as server}]
-  (let [server (assoc server :messages [])] ; Clear messages
+  (let [server (assoc server :messages [])] ; FIXME Need to clear messages?
     (case state
       :follower (handle-follower request server)
       :candidate (handle-candidate request server)
@@ -151,16 +152,20 @@
   (doseq [{:keys [to] :as message} messages]
     (>! (to inboxes) message)))
 
-(defn start [config]
-  (let [heartbeat (timeout 300)]
-    (go-loop [[id server] config]
-      (let [inbox (id @inboxes)
-            request (<! (alts! heartbeat inbox))
-            new-server (handle request server)
-            response [id new-server]]
-        #_(send-messages! new-server) ; TODO
-        (t/info response)
-        (recur response)))))
+(defn create-loop
+  "Advances the node simulation one step."
+  [node duration]
+  (let [[id initial-node] node
+        inbox (id @inboxes)]
+    (go-loop [node initial-node]
+      (let [[message port] (alts! [(timeout duration) inbox stop])
+            stop? (= port stop)]
+        (when-not stop?
+          (let [new-node (handle message node)]
+            #_(send-messages! new-node) ; TODO
+            (t/info {:node node})
+            (t/info {:new-node new-node})
+            (recur node)))))))
 
 (defn network-1 []
   {:1 (create [])})
@@ -169,6 +174,11 @@
   {:1 (create [:2])
    :2 (create [:1])})
 
+(defn network-3 []
+  {:1 (create [:2 :3])
+   :2 (create [:1 :3])
+   :3 (create [:1 :2])})
+
 (defn network-5 []
   {:1 (create [:2 :3 :4 :5])
    :2 (create [:1 :3 :4 :5])
@@ -176,11 +186,19 @@
    :4 (create [:1 :2 :3 :5])
    :5 (create [:1 :2 :3 :4])})
 
-(defn main
-  "Create a network configuration and start each server."
+(def network (network-1))
+
+(defn stop-sim [] (clojure.core.async/close! stop))
+
+(defn start
+  "Create a network and start a loop for each server."
   []
-  (let [network (network-2)
-        c (count network)]
+  (let [ids (keys network)
+        event {:nodes ids
+               :state :started}]
     (doseq [node network]
-      (start node))
-    (t/info c " Server(s) started.")))
+      (create-loop node 3000))
+    (t/info event)))
+
+#_(start)
+#_(close! stop)
