@@ -3,26 +3,6 @@
             [raft.append-entries :as a]
             [taoensso.timbre :as t]))
 
-
-(defn create-1 []
-  {:1 (n/create :1 [])})
-
-(defn create-2 []
-  {:1 (n/create :1 [:2])
-   :2 (n/create :2 [:1])})
-
-(defn create-3 []
-  {:1 (n/create :1 [:2 :3])
-   :2 (n/create :2 [:1 :3])
-   :3 (n/create :3 [:1 :2])})
-
-(defn create-5 []
-  {:1 (n/create :1 [:2 :3 :4 :5])
-   :2 (n/create :2 [:1 :3 :4 :5])
-   :3 (n/create :3 [:1 :2 :4 :5])
-   :4 (n/create :4 [:1 :2 :3 :5])
-   :5 (n/create :5 [:1 :2 :3 :4])})
-
 (defn peer
   "Takes a peer id and create a peer map."
   [id]
@@ -45,6 +25,25 @@
    :peers (mapv peer peers)
    :log []
    :messages []})
+
+(defn create-1 []
+  {:1 (create :1 [])})
+
+(defn create-2 []
+  {:1 (create :1 [:2])
+   :2 (create :2 [:1])})
+
+(defn create-3 []
+  {:1 (create :1 [:2 :3])
+   :2 (create :2 [:1 :3])
+   :3 (create :3 [:1 :2])})
+
+(defn create-5 []
+  {:1 (create :1 [:2 :3 :4 :5])
+   :2 (create :2 [:1 :3 :4 :5])
+   :3 (create :3 [:1 :2 :4 :5])
+   :4 (create :4 [:1 :2 :3 :5])
+   :5 (create :5 [:1 :2 :3 :4])})
 
 (defn follower [server]
   (assoc server :state :follower))

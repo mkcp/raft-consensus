@@ -17,7 +17,7 @@
 ;; Inboxes and outboxes are pretty janky global state, but they work for a simple local simulation.
 ;; I would eventually like to abstract this out.
 ;; If I were being optimisic this is a simple impl of ports on loopback.
-;; Ideally, these wouldn't be predefined, but 
+;; Ideally, this var would be populated based on the number of nodes being created.
 (def network
   (atom {:1 {:in (chan)
              :out (chan)}
@@ -29,19 +29,6 @@
              :out (chan)}
          :5 {:in (chan)
              :out (chan)}}))
-
-(defn broadcast-append
-  "Debug function to test adding to all inboxes."
-  []
-  (go (doseq [[id inbox] @inboxes]
-        (>! inbox [:request-append {}]))))
-
-(defn send-messages!
-  [{:keys [messages]}]
-  (let [inboxes @inboxes]
-    (doseq [message messages]
-      (let [[procedure body] message]
-        (>! ((:to body) inboxes) message)))))
 
 (defn start-node
   "Reads off of each node's inbox until a timeout is reached or the node receives a signal on the
@@ -73,11 +60,12 @@
 (defn start!
   "Create a network and start a loop for each server."
   []
-  (let [ids (keys @network)
+  (let [nodes (n/create-1)
+        ids (keys nodes)
         event {:nodes ids
                :count (count ids)
                :state :started}]
-    (doseq [node network]
+    (doseq [node nodes]
       (start-node node 3000))
     (t/info event)))
 
