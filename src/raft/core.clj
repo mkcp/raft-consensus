@@ -14,7 +14,7 @@
 ;; FIXME Move these pieces of state off of the namespace.
 (def reader-ctrl (chan 100))
 (def writer-ctrl (chan 100))
-(def network (n/create-2))
+(def network (n/create-1))
 
 ;; Sends a message to its destination node's in channel
 (defn send! [message network]
@@ -22,6 +22,7 @@
         destination (get-in network [to :in])]
     (>! destination message)))
 
+;; FIXME Decompose state management from data transformations
 (defn start-node
   "Reads off of each node's inbox until a timeout is reached or the node receives a signal on the
   ctrl-chan."
@@ -33,24 +34,21 @@
       (let [[message port] (alts! [(timeout election-timeout) in reader-ctrl])
             stop? (= port reader-ctrl)]
         (when-not stop?
-          (let [new-node (n/handle message @node)]
+          (let [new-node (n/read message @node)]
             (swap! node merge new-node))
           (recur))))
 
     ;; Write loop
-    ;; FIXME Super janky pleasefix oh my god. Write some write handlers
     (go-loop []
       (let [append (timeout append-frequency)
-            [message port] (alts! [out append writer-ctrl])
+            [message port] (alts! [append out writer-ctrl])
+            current-node @node
             stop? (= port writer-ctrl)]
         (when-not stop?
-          (let [{:keys [state peers]} @node
-                [procedure {:keys [to]}] message]
-            (case procedure
-              :append-entries (t/info {:sent :append-entires})
-              :request-vote (t/info {:sent :request-vote})
-              :nil (when (n/leader? state)
-                     (t/info {:message [:append-entries {:times (count peers)}]}))))
+          (let [{:keys [state]} current-node
+                [procedure {:keys [to]}] message
+                new-node (n/write message current-node)]
+            (swap! node merge new-node))
           (recur))))))
 
 (defn stop!

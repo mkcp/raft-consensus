@@ -69,7 +69,7 @@
   [f message {:keys [messages] :as node}]
   (assoc node :messages (conj messages (f message node))))
 
-(defn handle
+(defn read
   [[procedure message]
    {:keys [state id] :as node}]
   (case state
@@ -90,3 +90,15 @@
                          :message (str "Leader not implemented. Node " id " demoting to follower.")}]
               (t/info event)
               (follower node))))
+
+(defn write
+  "FIXME: Prints then returns the server state."
+  [[procedure body] {:keys [state peers] :as node}]
+  (case procedure
+    :append-entries (do (t/info {:sent :append-entires})
+                        node)
+    :request-vote (do (t/info {:sent :request-vote})
+                      node)
+    nil (when (leader? state)
+          (t/info {:rpc [:append-entries {}]})
+          node)))
