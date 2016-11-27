@@ -24,8 +24,8 @@
                 :peers (mapv peer peers)
                 :log []
                 :messages []})
-   :in (chan 100)
-   :out (chan 100)})
+   :in (chan 1000)
+   :out (chan 1000)})
 
 ;; NOTE The peer ids get passed in at runtime because it would be useful to eventually simulate full and bridged network partitions.
 (defn create-1 []
@@ -69,13 +69,19 @@
   [f message {:keys [messages] :as node}]
   (assoc node :messages (conj messages (f message node))))
 
-(defn read
+(defn read-in
   [[procedure message]
    {:keys [state id] :as node}]
   (case state
     :follower (case procedure
-                :request-vote (r/handle message node)
-                :append-entries (a/handle-append-entries message node)
+                :request-vote (do
+                                (t/info {:id id
+                                         :message (str "No leader found. Node " id " promoted to candidate.")})
+                                node)
+                :append-entries (do
+                                  (t/info {:id id
+                                           :message (str "No leader found. Node " id " promoted to candidate.")})
+                                  node)
                 nil (do
                       (t/info {:id id
                                :message (str "No leader found. Node " id " promoted to candidate.")})
@@ -91,14 +97,19 @@
               (t/info event)
               (follower node))))
 
-(defn write
-  "FIXME: Prints then returns the server state."
-  [[procedure body] {:keys [state peers] :as node}]
-  (case procedure
-    :append-entries (do (t/info {:sent :append-entires})
-                        node)
-    :request-vote (do (t/info {:sent :request-vote})
-                      node)
-    nil (when (leader? state)
-          (t/info {:rpc [:append-entries {}]})
-          node)))
+(defn write-out
+  "FIXME: Pretty janky, please clean me up."
+  [[procedure body]
+   {:keys [node out] :as server}]
+  (let [{:keys [state] :as current-node} @node]
+    (case procedure
+      :append-entries (do (t/info {:sent :append-entires})
+                          current-node)
+      :request-vote (do (t/info {:sent :request-vote})
+                        current-node)
+      nil (when (leader? state)
+            (let [messages (a/create-requests current-node)]
+              (t/info {:messages messages})
+              #_(doseq [message messages]
+                  (>! out message))
+              current-node)))))

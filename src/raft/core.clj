@@ -14,27 +14,29 @@
 ;; FIXME Move these pieces of state off of the namespace.
 (def reader-ctrl (chan 100))
 (def writer-ctrl (chan 100))
-(def network (n/create-1))
+(def network (n/create-2))
 
-;; Sends a message to its destination node's in channel
-(defn send! [message network]
-  (let [[_ {:keys [to]}] message
+(defn send!
+  "Takes a message and a network of nodes and pushes the message into the inbox
+  of the node referenced in the message's :to field."
+  [message network]
+  (let [[procedure {:keys [to]}] message
         destination (get-in network [to :in])]
     (>! destination message)))
 
 ;; FIXME Decompose state management from data transformations
 (defn start-node
-  "Reads off of each node's inbox until a timeout is reached or the node receives a signal on the
-  ctrl-chan."
-  [id election-timeout append-frequency]
-  (let [{:keys [node in out]} (id network)]
+  "Takes the node."
+  [server network election-timeout append-frequency]
+  (let [{:keys [node in out]} server]
 
     ;; Read loop
     (go-loop []
-      (let [[message port] (alts! [(timeout election-timeout) in reader-ctrl])
+      (let [promote (timeout election-timeout)
+            [message port] (alts! [promote in reader-ctrl])
             stop? (= port reader-ctrl)]
         (when-not stop?
-          (let [new-node (n/read message @node)]
+          (let [new-node (n/read-in message @node)]
             (swap! node merge new-node))
           (recur))))
 
@@ -42,12 +44,9 @@
     (go-loop []
       (let [append (timeout append-frequency)
             [message port] (alts! [append out writer-ctrl])
-            current-node @node
             stop? (= port writer-ctrl)]
         (when-not stop?
-          (let [{:keys [state]} current-node
-                [procedure {:keys [to]}] message
-                new-node (n/write message current-node)]
+          (let [new-node (n/write-out message server)]
             (swap! node merge new-node))
           (recur))))))
 
@@ -67,4 +66,4 @@
                :state :starting}]
     (t/info event)
     (doseq [id ids]
-      (start-node id 2000 500))))
+      (start-node (id network) network 2000 500))))
