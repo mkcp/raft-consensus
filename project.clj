@@ -6,5 +6,4 @@
   :dependencies [[org.clojure/clojure "1.9.0-alpha14"]
                  [org.clojure/core.async "0.2.374"]
                  [org.clojure/test.check "0.9.0"]
-                 [com.taoensso/timbre "4.3.1"]
-                 [prismatic/schema "1.1.3"]])
+                 [com.taoensso/timbre "4.3.1"]])
