@@ -1,6 +1,6 @@
 # raft
 
-Playing with an implemention of raft for brain training. This algorithm simulation is incomplete, the section Implementation Status below tracks my current progress.
+Playing with a single process simulation of raft for the purposes of building a generally usable full raft impementation in Clojure. This algorithm is not complete or ready to be used, the section Implementation Status below tracks my current progress.
 
 ## Goals
 
