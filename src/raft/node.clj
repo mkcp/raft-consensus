@@ -24,8 +24,8 @@
                 :peers (mapv peer peers)
                 :log []
                 :messages []})
-   :in (chan)
-   :out (chan)})
+   :in (chan 100)
+   :out (chan 100)})
 
 ;; NOTE The peers get passed in at runtime because it would be useful to eventually simulate full and bridged network partitions.
 (defn create-1 []
@@ -46,11 +46,6 @@
    :3 (create {:id :3 :peers [:1 :2 :4 :5]})
    :4 (create {:id :4 :peers [:1 :2 :3 :5]})
    :5 (create {:id :5 :peers [:1 :2 :3 :4]})})
-
-(defn commit-update
-  "Takes an atom containing the node map and merges new-node's changes into it."
-  [node new-node]
-  (swap! node merge new-node))
 
 (defn follower [node]
   (assoc node :state :follower))
@@ -82,14 +77,16 @@
                 :request-vote (r/handle message node)
                 :append-entries (a/handle-append-entries message node)
                 nil (do
-                      (t/info {:id (:id node)
-                               :message (str "No leader detected. Node " id " becoming candidate.")})
+                      (t/info {:id id
+                               :message (str "No leader detected. Node " id " promoted to candidate.")})
                       (candidate node)))
 
-    :candidate (case procedure
-                 :request-vote (r/respond-vote message node)
-                 :append-entries (a/respond-append message node))
+    :candidate (let [event {:id id
+                           :message (str "Majority votes received. Node " id " promoted to leader.")}]
+                 (t/info event)
+                 (leader node))
 
-    :leader (case procedure
-              :request-vote (r/respond-vote message node)
-              :append-entries (a/request-append message node))) )
+    :leader (let [event {:id id
+                         :message (str "Node " id " demoting to follower.")}]
+              (t/info event)
+              (follower node))))

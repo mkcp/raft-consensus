@@ -11,7 +11,7 @@
                                                  :backlog 32
                                                  :path "raft.log"})}})
 
-(def ctrl-chan (chan))
+(def ctrl-chan (chan 100))
 (def network (n/create-1))
 
 (defn start-node
@@ -22,12 +22,11 @@
 
     ;; Reader loop
     (go-loop []
-      (t/info {:message "Loop started"})
       (let [[message port] (alts! [(timeout election-timeout) in ctrl-chan])
             stop? (= port ctrl-chan)]
         (when-not stop?
           (let [new-node (n/handle message @node)]
-            (n/commit-update node new-node)
+            (swap! node merge new-node)
             (recur)))))
 
     ;; Writer loop
@@ -51,7 +50,7 @@
   (let [ids (keys network)
         event {:nodes ids
                :count (count ids)
-               :state :started}]
+               :state :starting}]
+    (t/info event)
     (doseq [id ids]
-      (start-node id 1000 250))
-    (t/info event)))
+      (start-node id 1000 250))))
