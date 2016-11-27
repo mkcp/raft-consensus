@@ -17,18 +17,8 @@
 ;; Inboxes and outboxes are pretty janky global state, but they work for a simple local simulation.
 ;; I would eventually like to abstract this out.
 ;; If I were being optimisic this is a simple impl of ports on loopback.
-;; Ideally, this var would be populated based on the number of nodes being created.
 (def network
-  (atom {:1 {:in (chan)
-             :out (chan)}
-         :2 {:in (chan)
-             :out (chan)}
-         :3 {:in (chan)
-             :out (chan)}
-         :4 {:in (chan)
-             :out (chan)}
-         :5 {:in (chan)
-             :out (chan)}}))
+  (n/create-1))
 
 (defn start-node
   "Reads off of each node's inbox until a timeout is reached or the node receives a signal on the
