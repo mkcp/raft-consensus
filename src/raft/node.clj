@@ -47,9 +47,9 @@
    :4 (create {:id :4 :peers [:1 :2 :3 :5]})
    :5 (create {:id :5 :peers [:1 :2 :3 :4]})})
 
-(defn merge
+(defn commit-update
   "Takes an atom containing the node map and merges new-node's changes into it."
-  [{:keys [node]} new-node]
+  [node new-node]
   (swap! node merge new-node))
 
 (defn follower [node]

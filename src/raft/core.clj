@@ -22,26 +22,26 @@
 
     ;; Reader loop
     (go-loop []
+      (t/info {:message "Loop started"})
       (let [[message port] (alts! [(timeout election-timeout) in ctrl-chan])
             stop? (= port ctrl-chan)]
         (when-not stop?
           (let [new-node (n/handle message @node)]
-            (n/update node new-node)
-            (t/info {:message "read completed"
-                     :new-node new-node})
+            (n/commit-update node new-node)
             (recur)))))
 
     ;; Writer loop
-    (go-loop []
-      (let [state (:state @node)
-            [message port] (alts! [(if n/leader? append-frequency)
-                                   out
-                                   ctrl-chan])
-            stop? (= port ctrl-chan)]
-        (when-not stop?
-          (let [[_ {:keys [to]}] message
-                destination (get-in network [to :in])]
-            (>! destination message)))))))
+    #_(go-loop []
+        (let [state (:state @node)
+              [message port] (alts! [(if n/leader? append-frequency)
+                                     out
+                                     ctrl-chan])
+              stop? (= port ctrl-chan)]
+          (when-not stop?
+            (let [[_ {:keys [to]}] message
+                  destination (get-in network [to :in])]
+              (>! destination message)))))
+    ))
 
 (defn stop! [] (>!! ctrl-chan :stop))
 
@@ -53,9 +53,5 @@
                :count (count ids)
                :state :started}]
     (doseq [id ids]
-      (start-node id 3000 1000))
+      (start-node id 1000 250))
     (t/info event)))
-
-;; Dev fns
-#_(start!)
-#_(stop!)
