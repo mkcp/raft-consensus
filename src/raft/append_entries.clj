@@ -13,7 +13,9 @@
    :commit-index integer?})
 
 (defn request-append
-  [peer {:keys [id current-term]}]
+  "TODO: Validate with a spec so you don't send garbage data."
+  [{:keys [peer]}
+   {:keys [id current-term]}]
   (let [body {:from id
               :to peer
               :term current-term
@@ -21,8 +23,9 @@
               :prev-term 0
               :entries []
               :commit-index 0}]
-    [:append-entries (s/conform ::request body)]))
+    [:append-entries body]))
 
+;; FIXME These names don't line up, very important to fix
 (defn create-requests
   [{:keys [peers] :as node}]
   (map #(request-append % node) peers))
