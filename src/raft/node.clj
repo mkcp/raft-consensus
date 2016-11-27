@@ -27,7 +27,7 @@
    :in (chan 100)
    :out (chan 100)})
 
-;; NOTE The peers get passed in at runtime because it would be useful to eventually simulate full and bridged network partitions.
+;; NOTE The peer ids get passed in at runtime because it would be useful to eventually simulate full and bridged network partitions.
 (defn create-1 []
   {:1 (create {:id :1 :peers[]})})
 
@@ -78,15 +78,15 @@
                 :append-entries (a/handle-append-entries message node)
                 nil (do
                       (t/info {:id id
-                               :message (str "No leader detected. Node " id " promoted to candidate.")})
+                               :message (str "No leader found. Node " id " promoted to candidate.")})
                       (candidate node)))
 
     :candidate (let [event {:id id
-                           :message (str "Majority votes received. Node " id " promoted to leader.")}]
+                           :message (str "Election not implemented. Node " id " promoted to leader.")}]
                  (t/info event)
                  (leader node))
 
     :leader (let [event {:id id
-                         :message (str "Node " id " demoting to follower.")}]
+                         :message (str "Leader not implemented. Node " id " demoting to follower.")}]
               (t/info event)
               (follower node))))
