@@ -66,6 +66,10 @@
          :match-index commit-index ; FIXME What is this? -- old: Probably bugged, check peers?
          ))
 
+(defn leader?
+  [state]
+  (= state :leader))
+
 (defn add-message
   [f message {:keys [messages] :as node}]
   (assoc node :messages (conj messages (f message node))))
