@@ -1,6 +1,6 @@
 # raft
 
-Playing with a single process simulation of raft for the purposes of building a generally usable full raft impementation in Clojure. This algorithm is not complete or ready to be used, the section Implementation Status below tracks my current progress.
+Working on a single process simulation of raft for the purposes of building a generally usable full raft impementation in Clojure. This algorithm is not complete or ready to be used, the section Implementation Status below tracks current progress.
 
 ## Goals
 
@@ -31,7 +31,7 @@ Once a node has received a majority of votes from the cluster, it transitions fr
 
 - [ ] Log Replication
 
-- [ ] Safety
+- [ ] Committed entries
 
 - [ ] Log Compaction
 
@@ -39,7 +39,16 @@ Once a node has received a majority of votes from the cluster, it transitions fr
 
 Currently developing with cider, so running the code involved loading the project up and running a fn in core.
 
-Run `main` and the cluster will startup with the configuration bound in under `network`.
+Run `main` and the nodes will start with the state bound in `network`.
+
+
+## Project Goals
+
+I started this project out because I wanted to learn how raft works. Along the way, I learned that one of the reasons leader election is so difficult to implement is because of how difficult it is to simulate. I believe that the messaging layer of raft can be abstracted out such that one could run in a single process, many proccesses, or over a network, so that a consensus-based store can exist in those forms. I'm not really sure of the why yet, I'm just enjoying the challenge of designing it.
+
+## Community goals
+
+This isn't really useful yet so I doubt any kind of communal support organization would exist around it yet. However, if this project were to become useful to others, I would add some technical goals and acceptable design tradeoffs to help organize contributors.
 
 ## License
 
