@@ -14,11 +14,13 @@
 
 (defn request-append
   "TODO: Validate with a spec so you don't send garbage data."
-  [{:keys [peer]}
-   {:keys [id current-term]}]
+  [{:keys [peer]} id current-term]
+  (t/debug {:event :request-append
+            :peer peer
+            :id id})
   {:rpc :append-entries
-   :from id
    :to peer
+   :from id
    :term current-term
    :prev-index 0
    :prev-term 0
@@ -41,12 +43,6 @@
    :term integer?
    :success? boolean?
    :last-log-term integer?})
-
-
-;; FIXME This namespace probably shouldn't be concerned with how many times this function gets called. Try to move the map up to the boundary
-(defn create-requests
-  [{:keys [peers] :as node}]
-  (map #(request-append % node) peers))
 
 (defn create-responses
   [{:keys [peers] :as node}]

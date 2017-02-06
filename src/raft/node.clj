@@ -4,6 +4,9 @@
             [clojure.core.async :refer [chan go go-loop timeout >! >!! <! <!! alts! close!]]
             [taoensso.timbre :as t]))
 
+(def node-inbox-buffer 1000)
+(def node-outbox-buffer 1000)
+
 (defn peer
   "Takes a peer id and create a peer map."
   [id]
@@ -24,9 +27,9 @@
                 :peers (mapv peer peers)
                 :log []
                 :messages []})
-   :in (chan 1000)
+   :in (chan node-inbox-buffer)
+   :out (chan node-outbox-buffer)
    :in-ctrl (chan 100)
-   :out (chan 1000)
    :out-ctrl (chan 100)})
 
 (defn follower [node]
@@ -53,62 +56,63 @@
 
 (defn read-in
   [[procedure message]
-   {:keys [state id] :as node}]
+   {:keys [state id peers] :as node}]
   (case state
     :follower (case procedure
                 :request-vote (do
-                                (t/info {:id id
-                                         :message (str "No leader found. Node " id " promoted to candidate.")})
+                                ;; FIXME Send back vote reply if you haven't voted yet
                                 node)
                 :append-entries (do
-                                  (t/info {:id id
-                                           :message (str "No leader found. Node " id " promoted to candidate.")})
+                                  ;; FIXME Commit entries to log
                                   node)
                 nil (do
-                      (t/info {:id id
-                               :message (str "No leader found. Node " id " promoted to candidate.")})
+                      ;; FIXME Send out request-votes to peers
                       (candidate node)))
 
     :candidate (case procedure
-                 :request-vote (let [event {:id id
-                                            :message (str "Election not implemented. Node " id " promoted to leader.")}]
-                                 (t/info event)
-                                 node)
+                 :request-vote node ;; FIXME This is a noop, candidates vote for themselves in an election
+                 :append-entries node ;; FIXME If candidate receives an append-entries with a higher current-term you fold into follower
+                 nil (leader node))
 
-                 :append-entries (do
-                                   (t/info {:id id
-                                            :contents message
-                                            :message "Candidate received append-entries"})
-                                   node)
-                 nil (do
-                       (leader node)))
+    :leader (if-not (empty? peers)
+              node
+              (do
+                (t/debug {:state :leader
+                          :peers peers
+                          :event :demoting-no-peers})
+                (follower node)))))
 
-    :leader (let [event {:id id
-                         :message (str "Leader not implemented. Node " id " demoting to follower.")}]
-              (t/info event)
-              (follower node))))
+(defn create-request-appends
+  "Takes a collection of peers and the current node and creates an :append-entries for each peer."
+  [peers {:keys [id current-term]}]
+  (mapv #(a/request-append % id current-term) peers))
 
+;; FIXME write-out should be respond to messages differently depending on the state of the node.
 (defn write-out
-  [[procedure body]
-   {:keys [node out] :as server}]
-  (let [{:keys [state] :as current-node} @node]
-    (t/info "write-out called")
-    (case procedure
-      :append-entries (do (t/info {:sent :append-entries})
-                          current-node)
+  [[procedure body] {:keys [node out]}]
+  (let [node @node
+        {:keys [state peers id current-term]} node]
+    (case state
+      :leader (case procedure
+                :append-entries node ;; FIXME If candidate receives an append-entries with a higher current-term you fold into follower
+                :request-vote node
+                nil (let [messages (create-request-appends peers node)]
+                      (doseq [message messages]
+                        (t/debug {:event :append-entries-added :message message})
+                        (>!! out message))
+                      node))
 
-      :request-vote (do (t/info {:sent :request-vote})
-                        current-node)
+      :candidate (case prodcedure
+                   :request-vote node ;; FIXME Should a candidate demote if it finds a competing request-vote?
+                   :append-entries (follower node)
+                   :nil (leader node) ;; FIXME Only elect leader if majority of peers confirm your vote
+                   )
 
-      ;; FIXME Add :append-entries to node's outbox
-      nil (when (leader? state)
-            (let [messages (a/create-requests current-node)
-                  _ (t/info {:event :append-entries-created :messages messages})
-                  messages [{:append-entries [:append-entry {}]}]]
-              (doseq [message messages]
-                (t/info {:event :append-entries-added :message message})
-                (>! out message))
-              current-node)))))
+      :follower (case procedure
+                  :request-vote (r/respond-vote) ;; FIXME Add the respond vote to your outbox
+                  :append-entires node ;; FIXME Commit log entry if received from leader
+                  )
+      node)))
 
 (defn send!
   "Takes a message and a network of nodes and pushes the message into the inbox
@@ -116,7 +120,7 @@
   [message network]
   (let [[procedure {:keys [to]}] message
         destination (get-in network [to :in])]
-    (>! destination message)))
+    (>!! destination message)))
 
 (defn stop?
   "Takes the channel returned from alts! and the loop's ctrl-chan and checks if the ctrl-chan returned."
@@ -134,7 +138,6 @@
   [ms]
   (timeout ms))
 
-;; FIXME: Move network to its own namespace
 (defn start
   "Takes the node and creates read and write loops."
   [server election-timeout-ms append-ms]
@@ -149,7 +152,7 @@
             (swap! node merge new-node))
           (recur))))
 
-    ;; Write loop
+    ;; Write loop (FIXME Should this ever have to mutate its internal state?)
     (go-loop []
       (let [append-timeout (random-timeout append-ms)
             [message port] (alts! [append-timeout out out-ctrl])]
