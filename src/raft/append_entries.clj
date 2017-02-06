@@ -16,34 +16,24 @@
   "TODO: Validate with a spec so you don't send garbage data."
   [{:keys [peer]}
    {:keys [id current-term]}]
-  (let [body {:from id
-              :to peer
-              :term current-term
-              :prev-index 0
-              :prev-term 0
-              :entries []
-              :commit-index 0}]
-    [:append-entries body]))
-
-;; FIXME These names don't line up, very important to fix
-(defn create-requests
-  [{:keys [peers] :as node}]
-  (map #(request-append % node) peers))
-
-(defn create-response
-  "FIXME: We need to figure this one out"
-  [message node]
-  (let [body {:from (:id node)
-              :to (:id message)
-              :term (:current-term node)
-              :success? true
-              :match-index 0 ;; ???
-              }]
-    [:append-entries (s/conform ::response body)]))
+  {:rpc :append-entries
+   :from id
+   :to peer
+   :term current-term
+   :prev-index 0
+   :prev-term 0
+   :entries []
+   :commit-index 0})
 
 (defn respond-append
   [message node]
-  (t/info {:response (create-response)}))
+  {:rpc :append-entries
+   :from (:id node)
+   :to (:id message)
+   :term (:current-term node)
+   :success? true
+   :match-index 0 ;; ???
+   })
 
 (s/def ::response
   {:from keyword?
@@ -51,3 +41,13 @@
    :term integer?
    :success? boolean?
    :last-log-term integer?})
+
+
+;; FIXME This namespace probably shouldn't be concerned with how many times this function gets called. Try to move the map up to the boundary
+(defn create-requests
+  [{:keys [peers] :as node}]
+  (map #(request-append % node) peers))
+
+(defn create-responses
+  [{:keys [peers] :as node}]
+  (map #(respond-append % node) peers))
