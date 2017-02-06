@@ -25,8 +25,7 @@
                 :commit-index 0
                 :last-applied 0 ;; FIXME, What does this do?
                 :peers (mapv peer peers)
-                :log []
-                :messages []})
+                :log []})
    :in (chan node-inbox-buffer)
    :out (chan node-outbox-buffer)
    :in-ctrl (chan 100)
@@ -50,51 +49,39 @@
   [state]
   (= state :leader))
 
-(defn add-message
-  [f message {:keys [messages] :as node}]
-  (assoc node :messages (conj messages (f message node))))
-
 (defn read-in
   [[procedure message]
    {:keys [state id peers] :as node}]
   (case state
     :follower (case procedure
-                :request-vote (do
-                                ;; FIXME Send back vote reply if you haven't voted yet
-                                node)
-                :append-entries (do
-                                  ;; FIXME Commit entries to log
-                                  node)
-                nil (do
-                      ;; FIXME Send out request-votes to peers
-                      (candidate node)))
+                :request-vote node ;; FIXME Send back vote reply if you haven't voted yet
+                :append-entries node ;; FIXME Commit entries to log
+                nil (candidate node) ;; FIXME Send out request-votes to peers
+                )
 
     :candidate (case procedure
                  :request-vote node ;; FIXME This is a noop, candidates vote for themselves in an election
                  :append-entries node ;; FIXME If candidate receives an append-entries with a higher current-term you fold into follower
                  nil (leader node))
 
-    :leader (if-not (empty? peers)
+    :leader (if-not (empty? peers) ;; FIXME This could be a bad decision -- should a node be leader if it has no peers? Asking for a friend
               node
-              (do
-                (t/debug {:state :leader
-                          :peers peers
-                          :event :demoting-no-peers})
-                (follower node)))))
+              (follower node))))
 
 (defn create-request-appends
   "Takes a collection of peers and the current node and creates an :append-entries for each peer."
   [peers {:keys [id current-term]}]
   (mapv #(a/request-append % id current-term) peers))
 
-;; FIXME write-out should be respond to messages differently depending on the state of the node.
+;; FIXME This function is broken deeply. Think more about the behavior and message flow of each node's inbox and outbox.
+;;       you may only be able to fill in this functionality when read-in is more fully implemented. That's ok.
 (defn write-out
   [[procedure body] {:keys [node out]}]
   (let [node @node
         {:keys [state peers id current-term]} node]
     (case state
       :leader (case procedure
-                :append-entries node ;; FIXME If candidate receives an append-entries with a higher current-term you fold into follower
+                :append-entries node ;; FIXME If leader receives an append-entries with a higher current-term you fold into follower
                 :request-vote node
                 nil (let [messages (create-request-appends peers node)]
                       (doseq [message messages]
@@ -102,15 +89,17 @@
                         (>!! out message))
                       node))
 
-      :candidate (case prodcedure
-                   :request-vote node ;; FIXME Should a candidate demote if it finds a competing request-vote?
-                   :append-entries (follower node)
-                   :nil (leader node) ;; FIXME Only elect leader if majority of peers confirm your vote
+      :candidate (case procedure
+                   :request-vote node ;; FIXME Node should create request-votes to all peers when transitioning to candidate
+                   :append-entries node
+                   :nil node
                    )
 
+      ;; FIXME Check this assumption: A node in follower state sends out no messages.
       :follower (case procedure
-                  :request-vote (r/respond-vote) ;; FIXME Add the respond vote to your outbox
-                  :append-entires node ;; FIXME Commit log entry if received from leader
+                  :request-vote node
+                  :append-entries node
+                  nil node
                   )
       node)))
 
