@@ -4,47 +4,6 @@
             [clojure.core.async :refer [chan go go-loop timeout >! >!! <! <!! alts! close!]]
             [taoensso.timbre :as t]))
 
-(defn stop? [p ctrl-chan] (= p ctrl-chan))
-(defn random-timeout [ms] (timeout (rand-int ms)))
-
-(defn send!
-  "Takes a message and a network of nodes and pushes the message into the inbox
-  of the node referenced in the message's :to field."
-  [message network]
-  (let [[procedure {:keys [to]}] message
-        destination (get-in network [to :in])]
-    (>! destination message)))
-
-(defn stop
-  "Takes a node and stops it."
-  [node]
-  (>!! in-ctrl :stop)
-  (>!! out-ctrl :stop))
-
-;; FIXME: Move network to its own namespace
-(defn start
-  "Takes the node."
-  [server network election-timeout-ms append-ms]
-  (let [{:keys [node in out in-ctrl out-ctrl]} server]
-
-    ;; Read loop
-    (go-loop []
-      (let [election-timeout (random-timeout election-timeout-ms)
-            [message port] (alts! [election-timeout in in-ctrl])]
-        (when-not (stop? port in-ctrl)
-          (let [new-node (n/read-in message @node)]
-            (swap! node merge new-node))
-          (recur))))
-
-    ;; Write loop
-    (go-loop []
-      (let [append-timeout (random-timeout append-ms)
-            [message port] (alts! [append-timeout out out-ctrl])]
-        (when-not (stop? port out-ctrl)
-          (let [new-node (n/write-out message server)]
-            (swap! node merge new-node))
-          (recur))))))
-
 (defn peer
   "Takes a peer id and create a peer map."
   [id]
@@ -68,8 +27,7 @@
    :in (chan 1000)
    :in-ctrl (chan 100)
    :out (chan 1000)
-   :out-ctrl (chan 100)
-   })
+   :out-ctrl (chan 100)})
 
 (defn follower [node]
   (assoc node :state :follower))
@@ -83,7 +41,7 @@
          :state :leader
          :next-index (inc commit-index)
          :match-index commit-index ; FIXME What is this? -- old: Probably bugged, check peers?
-         ))
+))
 
 (defn leader?
   [state]
@@ -115,8 +73,7 @@
                  :request-vote (let [event {:id id
                                             :message (str "Election not implemented. Node " id " promoted to leader.")}]
                                  (t/info event)
-                                 node
-                                 )
+                                 node)
 
                  :append-entries (do
                                    (t/info {:id id
@@ -152,3 +109,51 @@
                 (t/info {:event :append-entries-added :message message})
                 (>! out message))
               current-node)))))
+
+(defn send!
+  "Takes a message and a network of nodes and pushes the message into the inbox
+  of the node referenced in the message's :to field."
+  [message network]
+  (let [[procedure {:keys [to]}] message
+        destination (get-in network [to :in])]
+    (>! destination message)))
+
+(defn stop?
+  "Takes the channel returned from alts! and the loop's ctrl-chan and checks if the ctrl-chan returned."
+  [p ctrl-chan]
+  (= p ctrl-chan))
+
+(defn stop
+  "Takes a node and pushes a stop signal to its reader and writer ctrl channels."
+  [{:keys [in-ctrl out-ctrl]}]
+  (>!! in-ctrl :stop)
+  (>!! out-ctrl :stop))
+
+(defn random-timeout
+  "Takes an int representing the upper ceiling ms and creates a timeout channel between then and 0ms."
+  [ms]
+  (timeout ms))
+
+;; FIXME: Move network to its own namespace
+(defn start
+  "Takes the node and creates read and write loops."
+  [server election-timeout-ms append-ms]
+  (let [{:keys [node in out in-ctrl out-ctrl]} server]
+
+    ;; Read loop
+    (go-loop []
+      (let [election-timeout (random-timeout election-timeout-ms)
+            [message port] (alts! [election-timeout in in-ctrl])]
+        (when-not (stop? port in-ctrl)
+          (let [new-node (read-in message @node)]
+            (swap! node merge new-node))
+          (recur))))
+
+    ;; Write loop
+    (go-loop []
+      (let [append-timeout (random-timeout append-ms)
+            [message port] (alts! [append-timeout out out-ctrl])]
+        (when-not (stop? port out-ctrl)
+          (let [new-node (write-out message server)]
+            (swap! node merge new-node))
+          (recur))))))
