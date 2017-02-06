@@ -13,7 +13,6 @@
                           :compare :uncommitted
                           :swap :committed})))
 
-
 ;; If this is append only then removing an entry probably isn't the way to go.
 ;; Log compaction, that is, truncating under a certain index, that makes sense.
 ;;;;;;;;;;;; TODO
