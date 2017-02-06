@@ -4,6 +4,47 @@
             [clojure.core.async :refer [chan go go-loop timeout >! >!! <! <!! alts! close!]]
             [taoensso.timbre :as t]))
 
+(defn stop? [p ctrl-chan] (= p ctrl-chan))
+(defn random-timeout [ms] (timeout (rand-int ms)))
+
+(defn send!
+  "Takes a message and a network of nodes and pushes the message into the inbox
+  of the node referenced in the message's :to field."
+  [message network]
+  (let [[procedure {:keys [to]}] message
+        destination (get-in network [to :in])]
+    (>! destination message)))
+
+(defn stop
+  "Takes a node and stops it."
+  [node]
+  (>!! in-ctrl :stop)
+  (>!! out-ctrl :stop))
+
+;; FIXME: Move network to its own namespace
+(defn start
+  "Takes the node."
+  [server network election-timeout-ms append-ms]
+  (let [{:keys [node in out in-ctrl out-ctrl]} server]
+
+    ;; Read loop
+    (go-loop []
+      (let [election-timeout (random-timeout election-timeout-ms)
+            [message port] (alts! [election-timeout in in-ctrl])]
+        (when-not (stop? port in-ctrl)
+          (let [new-node (n/read-in message @node)]
+            (swap! node merge new-node))
+          (recur))))
+
+    ;; Write loop
+    (go-loop []
+      (let [append-timeout (random-timeout append-ms)
+            [message port] (alts! [append-timeout out out-ctrl])]
+        (when-not (stop? port out-ctrl)
+          (let [new-node (n/write-out message server)]
+            (swap! node merge new-node))
+          (recur))))))
+
 (defn peer
   "Takes a peer id and create a peer map."
   [id]
@@ -25,27 +66,10 @@
                 :log []
                 :messages []})
    :in (chan 1000)
-   :out (chan 1000)})
-
-;; NOTE The peer ids get passed in at runtime because it would be useful to eventually simulate full and bridged network partitions.
-(defn create-1 []
-  {:1 (create {:id :1 :peers[]})})
-
-(defn create-2 []
-  {:1 (create {:id :1 :peers [:2]})
-   :2 (create {:id :2 :peers [:1]})})
-
-(defn create-3 []
-  {:1 (create {:id :1 :peers [:2 :3]})
-   :2 (create {:id :2 :peers [:1 :3]})
-   :3 (create {:id :3 :peers [:1 :2]})})
-
-(defn create-5 []
-  {:1 (create {:id :1 :peers [:2 :3 :4 :5]})
-   :2 (create {:id :2 :peers [:1 :3 :4 :5]})
-   :3 (create {:id :3 :peers [:1 :2 :4 :5]})
-   :4 (create {:id :4 :peers [:1 :2 :3 :5]})
-   :5 (create {:id :5 :peers [:1 :2 :3 :4]})})
+   :in-ctrl (chan 100)
+   :out (chan 1000)
+   :out-ctrl (chan 100)
+   })
 
 (defn follower [node]
   (assoc node :state :follower))
@@ -87,10 +111,20 @@
                                :message (str "No leader found. Node " id " promoted to candidate.")})
                       (candidate node)))
 
-    :candidate (let [event {:id id
-                           :message (str "Election not implemented. Node " id " promoted to leader.")}]
-                 (t/info event)
-                 (leader node))
+    :candidate (case procedure
+                 :request-vote (let [event {:id id
+                                            :message (str "Election not implemented. Node " id " promoted to leader.")}]
+                                 (t/info event)
+                                 node
+                                 )
+
+                 :append-entries (do
+                                   (t/info {:id id
+                                            :contents message
+                                            :message "Candidate received append-entries"})
+                                   node)
+                 nil (do
+                       (leader node)))
 
     :leader (let [event {:id id
                          :message (str "Leader not implemented. Node " id " demoting to follower.")}]
@@ -98,18 +132,23 @@
               (follower node))))
 
 (defn write-out
-  "FIXME: Pretty janky, please clean me up."
   [[procedure body]
    {:keys [node out] :as server}]
   (let [{:keys [state] :as current-node} @node]
+    (t/info "write-out called")
     (case procedure
-      :append-entries (do (t/info {:sent :append-entires})
+      :append-entries (do (t/info {:sent :append-entries})
                           current-node)
+
       :request-vote (do (t/info {:sent :request-vote})
                         current-node)
+
+      ;; FIXME Add :append-entries to node's outbox
       nil (when (leader? state)
-            (let [messages (a/create-requests current-node)]
-              (t/info {:messages messages})
-              #_(doseq [message messages]
-                  (>! out message))
+            (let [messages (a/create-requests current-node)
+                  _ (t/info {:event :append-entries-created :messages messages})
+                  messages [{:append-entries [:append-entry {}]}]]
+              (doseq [message messages]
+                (t/info {:event :append-entries-added :message message})
+                (>! out message))
               current-node)))))

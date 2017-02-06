@@ -1,66 +1,48 @@
 (ns raft.core
-  (:require [raft.node :as n]
+  (:require [raft.node :as node]
             [clojure.core.async :refer [chan go go-loop timeout >! >!! <! <!! alts! close!]]
             [clojure.spec :as s]
             [taoensso.timbre :as t]
             [taoensso.timbre.appenders.core :as appenders]
             [taoensso.timbre.appenders.3rd-party.rotor :as rotor]))
 
+;; Configure logging
 (t/merge-config! {:appenders
                   {:rotor (rotor/rotor-appender {:max-size (* 1024 1024 1024)
                                                  :backlog 32
                                                  :path "raft.log"})}})
 
-;; FIXME Move these pieces of state off of the namespace.
-(def reader-ctrl (chan 100))
-(def writer-ctrl (chan 100))
-(def network (n/create-2))
+;; NOTE The peer ids get passed in at runtime because it would be useful to eventually simulate full and bridged network partitions.
+(defn network
+  "Takes an int representing the number of nodes to create and returns a mapping of :id to node. "
+  [nodes]
+  (case nodes
+      1 {:1 (node/create {:id :1 :peers[]})}
 
-(defn send!
-  "Takes a message and a network of nodes and pushes the message into the inbox
-  of the node referenced in the message's :to field."
-  [message network]
-  (let [[procedure {:keys [to]}] message
-        destination (get-in network [to :in])]
-    (>! destination message)))
+      2 {:1 (node/create {:id :1 :peers [:2]})
+         :2 (node/create {:id :2 :peers [:1]})}
 
-;; FIXME Decompose state management from data transformations
-(defn start-node
-  "Takes the node."
-  [server network election-timeout append-frequency]
-  (let [{:keys [node in out]} server]
+      3 {:1 (node/create {:id :1 :peers [:2 :3]})
+         :2 (node/create {:id :2 :peers [:1 :3]})
+         :3 (node/create {:id :3 :peers [:1 :2]})}
 
-    ;; Read loop
-    (go-loop []
-      (let [promote (timeout election-timeout)
-            [message port] (alts! [promote in reader-ctrl])
-            stop? (= port reader-ctrl)]
-        (when-not stop?
-          (let [new-node (n/read-in message @node)]
-            (swap! node merge new-node))
-          (recur))))
+      5 {:1 (node/create {:id :1 :peers [:2 :3 :4 :5]})
+         :2 (node/create {:id :2 :peers [:1 :3 :4 :5]})
+         :3 (node/create {:id :3 :peers [:1 :2 :4 :5]})
+         :4 (node/create {:id :4 :peers [:1 :2 :3 :5]})
+         :5 (node/create {:id :5 :peers [:1 :2 :3 :4]})}
 
-    ;; Write loop
-    (go-loop []
-      (let [append (timeout append-frequency)
-            [message port] (alts! [append out writer-ctrl])
-            stop? (= port writer-ctrl)]
-        (when-not stop?
-          (let [new-node (n/write-out message server)]
-            (swap! node merge new-node))
-          (recur))))))
+      ;; Default is 1
+      {:1 (node/create {:id :1 :peers[]})}))
 
-(defn stop!
-  "FIXME: This is silly, each node needs its own set of ctrl chans."
-  []
-  (doseq [node network]
-    (>!! reader-ctrl :stop)
-    (>!! writer-ctrl :stop)))
+(defn stop [network]
+  (doseq [n network] (node/stop n)))
 
-(defn start!
-  "Create a network and start a loop for each server."
-  []
-  (let [ids (keys network)
+;; FIXME: Take network size as an arg
+(defn start
+  "Create a network and starts a loop for each server."
+  [network-size]
+  (let [ids (keys (network network-size))
         event {:nodes ids
                :count (count ids)
                :state :starting}]
