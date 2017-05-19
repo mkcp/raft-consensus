@@ -1,9 +1,7 @@
 (ns raft.append-entries
-  (:require [clojure.spec :as s]
-            [clojure.core.async :refer [>!]]
-            [taoensso.timbre :as t]))
+  (:require [clojure.core.async :refer [>!]]))
 
-(s/def ::request
+(def request
   {:from keyword?
    :to keyword?
    :term integer?
@@ -15,9 +13,9 @@
 (defn request-append
   "TODO: Validate with a spec so you don't send garbage data."
   [{:keys [peer]} id current-term]
-  (t/debug {:event :request-append
-            :peer peer
-            :id id})
+  (pr-str {:event :request-append
+           :peer peer
+           :id id})
   {:rpc :append-entries
    :to peer
    :from id
@@ -37,7 +35,7 @@
    :match-index 0 ;; ???
    })
 
-(s/def ::response
+(def response
   {:from keyword?
    :to keyword?
    :term integer?
