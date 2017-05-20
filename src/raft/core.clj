@@ -1,10 +1,21 @@
 (ns raft.core
   (:require [raft [append-entries :as a]
                   [request-vote :as rv]]
+            [mount.core :refer [defstate]]
             [clojure.core.async :refer [chan go go-loop timeout >! >!! <! <!! alts! close!]]))
 
 (def node-inbox-buffer 1000)
 (def node-outbox-buffer 1000)
+
+;; Start with a register, we'll do a hashmap later
+(defstate db
+  :start (atom))
+
+(defstate log
+  :start (atom []))
+
+(defstate node
+  :start (atom {:id 0}))
 
 (defn peer
   "Takes a peer id and create a peer map."
@@ -14,13 +25,22 @@
    :match-index 0
    :vote-granted false})
 
-(defn create
+(def node-spec
+  {:id integer?
+   :state #{:follower :candidate :leader}
+   :current-term integer?
+   :voted-for boolean?
+   :commit-index integer?
+   :last-applied integer? ;; FIXME What does this do? Check the simulation
+   :peers map?})
+
+(defn node-create
   "Takes the ID of the node and a collection of peers, returns an atom containing the initialized node map."
   [{:keys [id peers]}]
   {:node (atom {:id id
                 :state :follower
                 :current-term 0
-                :voted-for nil
+                :voted-for false
                 :commit-index 0
                 :last-applied 0 ;; FIXME, What does this do?
                 :peers (mapv peer peers)
@@ -84,7 +104,7 @@
                 :request-vote node
                 nil (let [messages (create-request-appends peers node)]
                       (doseq [message messages]
-                        (t/debug {:event :append-entries-added :message message})
+                        (pr-str {:event :append-entries-added :message message})
                         (>!! out message))
                       node))
 
@@ -103,8 +123,7 @@
       node)))
 
 (defn send!
-  "Takes a message and a network of nodes and pushes the message into the inbox
-  of the node referenced in the message's :to field."
+  "Takes a message and writes it to STDOUT"
   [message network]
   (let [[procedure {:keys [to]}] message
         destination (get-in network [to :in])]
@@ -115,7 +134,7 @@
   [p ctrl-chan]
   (= p ctrl-chan))
 
-(defn stop
+(defn node-stop
   "Takes a node and pushes a stop signal to its reader and writer ctrl channels."
   [{:keys [in-ctrl out-ctrl]}]
   (>!! in-ctrl :stop)
@@ -126,43 +145,16 @@
   [ms]
   (timeout ms))
 
-(defn start
+(defn node-start
   "Takes the node and creates read and write loops."
-  [server election-timeout-ms append-ms]
-  (let [{:keys [node in out in-ctrl out-ctrl]} server]
+  [opts]
+  (let [node (node-create )
+        timeout-ms (:election-timeout-ms opts)
+        append-ms  (:append-ms opts)]
 
-    ;; Read loop
-    (go-loop []
-      (let [election-timeout (random-timeout election-timeout-ms)
-            [message port] (alts! [election-timeout in in-ctrl])]
-        (when-not (stop? port in-ctrl)
-          (let [new-node (read-in message @node)]
-            (swap! node merge new-node))
-          (recur))))
-
-    ;; Write loop (FIXME Should this ever have to mutate its internal state?)
-    (go-loop []
-      (let [append-timeout (random-timeout append-ms)
-            [message port] (alts! [append-timeout out out-ctrl])]
-        (when-not (stop? port out-ctrl)
-          (let [new-node (write-out message server)]
-            (swap! node merge new-node))
-          (recur))))))
-
-(defn stop [network]
-  (doseq [[_ n] network] (node/stop n)))
-
-(defn start
-  "Create a network and starts a loop for each server."
-  [network-size]
-  (let [network (network/create network-size)
-        ids (keys network)]
-    (t/info {:nodes ids
-             :count (count ids)
-             :state :starting})
-    (doseq [id ids]
-      (node/start (id network) 2000 500))
-    network))
+    ;; TODO Election
+    ;; TODO Entries
+    ))
 
 (def opt-spec
   "TODO Spec out the CLI args"
@@ -170,4 +162,5 @@
 
 (defn -main
   [& args]
-  (start 5))
+  (node-start {:election-timeout-ms 5000
+               :append-ms 100}))
