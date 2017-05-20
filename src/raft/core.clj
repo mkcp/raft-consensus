@@ -1,4 +1,5 @@
 (ns raft.core
+  (:gen-class)
   (:require [raft [append-entries :as a]
                   [request-vote :as rv]]
             [mount.core :refer [defstate]]
