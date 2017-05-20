@@ -1,7 +1,7 @@
 (ns raft.append-entries
   (:require [clojure.core.async :refer [>!]]))
 
-(def request
+(def request-spec
   {:from keyword?
    :to keyword?
    :term integer?
@@ -35,7 +35,7 @@
    :match-index 0 ;; ???
    })
 
-(def response
+(def response-spec
   {:from keyword?
    :to keyword?
    :term integer?
