@@ -1,5 +1,5 @@
-(defproject raft "0.1.0-SNAPSHOT"
-  :description "Toy raft implementation for use with maelstrom"
+(defproject raft "0.1.0"
+  :description "Toy raft implementation for use with jepsen-io/maelstrom"
   :url "http://example.com/FIXME"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
