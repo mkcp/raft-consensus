@@ -1,0 +1,1 @@
+java -jar $HOME/development/raft-consensus/target/raft-0.1.0-standalone.jar
